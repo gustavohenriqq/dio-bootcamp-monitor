@@ -27,7 +27,9 @@ from classifier import (
     CLASSIFICATION_INDETERMINADA,
     CLASSIFICATION_MEDIA,
     CLASSIFICATION_BAIXA,
+    ENROLLMENT_ENCERRADO,
     classify,
+    evaluate_enrollment,
     parse_deadline,
 )
 from dio_scraper import CatalogBootcamp, DioScraper
@@ -185,12 +187,33 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
         # slots restantes de MAX_DETAIL_PAGES seriam sempre consumidos pelos
         # mesmos primeiros bootcamps do catálogo e mudanças no restante da
         # lista nunca seriam detectadas.
-        recheck_candidates = [
-            bc for bc in known_bootcamps
-            if (existing := history.get(bc.stable_id)) and existing.notification_status == "sent"
-        ]
+        #
+        # Bootcamps com prazo vencido ficam de fora: a data não volta atrás, e
+        # uma nova edição entra no catálogo com outro slug (portanto, outro
+        # stable_id). Rechecá-los gastaria os slots do dia com programas mortos
+        # — hoje 212 dos 217 — e adiaria por semanas a reverificação dos poucos
+        # que ainda estão abertos, que são justamente os que importam.
+        recheck_candidates = []
+        skipped_expired = 0
+        for bc in known_bootcamps:
+            existing = history.get(bc.stable_id)
+            if not existing or existing.notification_status != "sent":
+                continue
+            status, _ = evaluate_enrollment(bc.launch_info)
+            if status == ENROLLMENT_ENCERRADO:
+                skipped_expired += 1
+                continue
+            recheck_candidates.append(bc)
+
         recheck_candidates.sort(key=lambda bc: history[bc.stable_id].last_checked_at or "")
         bootcamps_to_detail.extend(recheck_candidates)
+
+        if skipped_expired:
+            logger.info(
+                "Rechecagem: %d candidatos com inscrição aberta. %d ignorados por prazo vencido.",
+                len(recheck_candidates),
+                skipped_expired,
+            )
 
         # Processa bootcamps com detalhe
         for bc in bootcamps_to_detail:
