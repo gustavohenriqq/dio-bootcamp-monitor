@@ -6,6 +6,7 @@ Monitora automaticamente novos bootcamps publicados no catálogo público da [DI
 
 ## Sumário
 
+- [Começando do zero](#começando-do-zero)
 - [Objetivo](#objetivo)
 - [Arquitetura](#arquitetura)
 - [Instalação local](#instalação-local)
@@ -14,12 +15,86 @@ Monitora automaticamente novos bootcamps publicados no catálogo público da [DI
 - [Configuração das variáveis de ambiente](#configuração-das-variáveis-de-ambiente)
 - [Execução local](#execução-local)
 - [GitHub Actions](#github-actions)
+- [Situação da inscrição (prazo)](#situação-da-inscrição-prazo)
 - [Interpretação das classificações](#interpretação-das-classificações)
 - [Como funciona a persistência do JSON](#como-funciona-a-persistência-do-json)
 - [Comportamento de primeira execução](#comportamento-de-primeira-execução)
 - [Limitações conhecidas](#limitações-conhecidas)
 - [Como ajustar palavras-chave e pontuação](#como-ajustar-palavras-chave-e-pontuação)
 - [Depurando falhas comuns](#depurando-falhas-comuns)
+
+---
+
+## Começando do zero
+
+Do repositório clonado até receber a primeira notificação.
+
+### 1. Ambiente
+
+```bash
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Linux/macOS
+pip install -r requirements.txt
+pytest -q                    # deve passar tudo
+```
+
+### 2. Criar o bot
+
+No Telegram, fale com o [@BotFather](https://t.me/BotFather) → `/newbot` → escolha
+nome e username. Ele devolve um token no formato `123456789:AA...`.
+
+### 3. Liberar o seu chat ← o passo que todo mundo esquece
+
+Abra a conversa com o bot que você acabou de criar e envie **`/start`**.
+
+Um bot do Telegram **não consegue iniciar conversa** com ninguém. Enquanto ele
+nunca tiver recebido uma mensagem sua, todo envio falha com
+`400 Bad Request: chat not found` — mesmo com token e chat ID corretos.
+
+### 4. Descobrir o seu Chat ID
+
+```bash
+curl "https://api.telegram.org/bot<SEU_TOKEN>/getUpdates"
+```
+
+O número em `result[0].message.chat.id` é o seu chat ID. Se vier
+`"result":[]`, o passo 3 não foi feito.
+
+### 5. Configurar
+
+```bash
+cp .env.example .env          # Linux/macOS
+Copy-Item .env.example .env   # Windows PowerShell
+```
+
+Edite o `.env` e preencha `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`. Não
+renomeie o `.env.example` — copie, para manter o modelo no repositório.
+
+### 6. Testar a conexão antes de valer
+
+```bash
+python -c "import sys; sys.path.insert(0,'src'); \
+from config import load_config; from telegram_notifier import build_notifier, NewBootcampNotification; \
+c=load_config(); n=build_notifier(c.telegram_bot_token, c.telegram_chat_id); \
+print('enviado:', n.notify_new_bootcamp(NewBootcampNotification('Teste','','','TESTE',0,[],'ok','hoje'))); n.close()"
+```
+
+Se imprimir `enviado: True` e a mensagem chegar, está tudo certo. Se falhar, o
+log diz exatamente o quê e o que fazer.
+
+### 7. Primeira execução
+
+```bash
+INITIAL_NOTIFY=false MAX_DETAIL_PAGES=250 python src/main.py
+```
+
+Registra e classifica o catálogo inteiro sem notificar (leva ~10 min). Da
+próxima vez em diante, só chega novidade de verdade.
+
+### 8. Automatizar
+
+Veja [GitHub Actions](#github-actions).
 
 ---
 
@@ -43,11 +118,13 @@ dio-bootcamp-monitor/
 │   ├── storage.py           # Persistência atômica do histórico em JSON
 │   └── config.py            # Leitura e validação das variáveis de ambiente
 ├── tests/
-│   ├── test_classifier.py   # Testes de classificação (falsos positivos, expirados…)
-│   ├── test_storage.py      # Testes de leitura/escrita/upsert do histórico
-│   ├── test_scraper.py      # Testes do scraper com HTML mockado
-│   ├── test_main_flow.py    # Testes de integração do fluxo principal
-│   └── fixtures/            # HTMLs fictícios para testes sem internet
+│   ├── test_classifier.py         # Classificação: falsos positivos, boilerplate, prazo
+│   ├── test_storage.py            # Leitura/escrita/upsert do histórico
+│   ├── test_scraper.py            # Scraper com HTML mockado
+│   ├── test_config.py             # Parser de .env e precedência do ambiente
+│   ├── test_telegram_notifier.py  # Envio, rate limit e throttle (rede mockada)
+│   ├── test_main_flow.py          # Integração do fluxo principal
+│   └── fixtures/                  # HTMLs para testes sem internet
 ├── data/
 │   └── bootcamps.json       # Histórico persistido (commitado pelo Actions)
 ├── .github/workflows/
@@ -79,8 +156,11 @@ Envia resumo diário (opcional)
 
 **Estratégias de scraping (em ordem de prioridade):**
 
-1. **JSON embutido (`__NEXT_DATA__`):** a DIO usa Next.js; parte dos dados do catálogo pode estar serializada em `<script id="__NEXT_DATA__">`. O scraper extrai recursivamente a estrutura JSON em busca de objetos com nome + slug de bootcamp.
-2. **Parsing HTML:** caso o JSON não esteja disponível, o scraper busca todos os `<a href>` com padrão `/bootcamp/<slug>` e tenta extrair nome, empresa e resumo do contexto ao redor.
+1. **Caminho canônico do `__NEXT_DATA__`:** a DIO usa Next.js e serializa o catálogo em `<script id="__NEXT_DATA__">`. O scraper lê `props.pageProps.bootcamps`, que traz `slug`, `name`, `type`, `finish` (prazo) e `skills` de cada bootcamp.
+2. **Busca genérica no JSON:** se aquela chave sumir, varre o JSON procurando objetos com nome + slug, ignorando subárvores de navegação e i18n.
+3. **Parsing HTML:** por último, busca todos os `<a href>` com padrão `/bootcamp/<slug>` e extrai nome, empresa e resumo do contexto ao redor.
+
+> **Por que o caminho canônico vem primeiro.** O mesmo `__NEXT_DATA__` contém `props.pageProps.navigation`, cujos itens também têm `name` e `slug` — mas são **carreiras**, não bootcamps. Seus slugs (`ai-agent-builder`, `ai-automation`…) não correspondem a páginas `/bootcamp/<slug>`, então uma busca genérica casa com eles primeiro e produz um catálogo inteiro de URLs que retornam 404.
 
 Ambas as estratégias são defensivas: campos ausentes recebem valores padrão seguros e erros não interrompem a execução.
 
@@ -183,52 +263,135 @@ são injetados diretamente no ambiente e não existe `.env`.
 ## Execução local
 
 ```bash
-# Executar testes
-pytest tests/ -v
+# Executar os testes
+pytest -q
 
-# Executar o monitor
-cd dio-bootcamp-monitor
+# Executar o monitor (lê o .env automaticamente)
 python src/main.py
 
 # Com log detalhado
 LOG_LEVEL=DEBUG python src/main.py
 ```
 
-**Execução manual sem notificação (apenas salvar histórico):**
+### Receitas de uso
+
+Variáveis de ambiente têm precedência sobre o `.env`, então dá para ajustar
+uma execução sem editar arquivo nenhum.
+
+**Primeira execução — registrar o catálogo sem receber 200 mensagens:**
 
 ```bash
-INITIAL_NOTIFY=false SEND_DAILY_SUMMARY=false python src/main.py
+# Linux/macOS
+INITIAL_NOTIFY=false MAX_DETAIL_PAGES=250 python src/main.py
+
+# Windows PowerShell
+$env:INITIAL_NOTIFY="false"; $env:MAX_DETAIL_PAGES="250"; python src/main.py
 ```
+
+Registra e classifica todo o catálogo em silêncio. A partir da execução
+seguinte, só chegam bootcamps genuinamente novos. **É o modo recomendado para
+começar.**
+
+**Ensaiar sem tocar no histórico nem no Telegram:**
+
+```bash
+TELEGRAM_BOT_TOKEN="" TELEGRAM_CHAT_ID="" LOG_LEVEL=DEBUG python src/main.py
+```
+
+Sem credenciais o notificador vira *noop*: ele apenas registra no log o que
+teria enviado. Útil para conferir a classificação antes de valer.
+
+**Ver o que está aberto agora, sem executar o monitor:**
+
+```bash
+python -c "import json; from datetime import date; \
+d=json.load(open('data/bootcamps.json',encoding='utf-8')); \
+[print(f\"{r['days_left']:4}d  {r['classification']:14} {r['name']}\") \
+ for r in sorted([x for x in d if x.get('enrollment_status')=='ABERTO'], \
+                 key=lambda r: r['days_left'])]"
+```
+
+**Reclassificar tudo em silêncio** (depois de mexer em `src/classifier.py`):
+
+```bash
+TELEGRAM_BOT_TOKEN="" TELEGRAM_CHAT_ID="" MAX_DETAIL_PAGES=250 python src/main.py
+```
+
+Grava as classificações novas no histórico sem notificar. Sem isso, a próxima
+execução interpreta a mudança de critério como "atualização detectada" e
+dispara notificações que não correspondem a mudança nenhuma na DIO.
+
+### Quanto tempo leva
+
+O gargalo é `REQUEST_DELAY_SECONDS` (padrão 2s) multiplicado por
+`MAX_DETAIL_PAGES`. Varredura completa do catálogo (~217 páginas) leva de 8 a
+12 minutos. A execução diária é bem mais rápida: só busca detalhe de bootcamps
+novos e dos que ainda estão com inscrição aberta.
 
 ---
 
 ## GitHub Actions
 
+Com o Actions configurado o bot roda sozinho — seu computador não precisa estar
+ligado.
+
 ### Configuração dos secrets
 
-No seu repositório GitHub:
+Pela interface: **Settings → Secrets and variables → Actions**, criando
+`TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`.
 
-1. Vá em **Settings → Secrets and variables → Actions**.
-2. Crie dois secrets:
-   - `TELEGRAM_BOT_TOKEN`: token do seu bot.
-   - `TELEGRAM_CHAT_ID`: ID do chat de destino.
+Ou pelo [GitHub CLI](https://cli.github.com/), que evita o valor aparecer no
+histórico do shell:
+
+```bash
+gh secret set TELEGRAM_BOT_TOKEN   # cola o valor no prompt
+gh secret set TELEGRAM_CHAT_ID
+gh secret list                     # confirma
+```
+
+Os secrets ficam protegidos mesmo em repositório público, e o GitHub mascara
+automaticamente qualquer valor deles que apareça em log.
 
 ### Execução automática
 
-O workflow `.github/workflows/monitor.yml` executa automaticamente:
+O workflow `.github/workflows/monitor.yml` executa:
+
 - **Diariamente às 08:00 BRT** (11:00 UTC) via `schedule`.
-- **Manualmente** via **Actions → Run workflow**, com opções de `INITIAL_NOTIFY` e `SEND_DAILY_SUMMARY`.
+- **Manualmente** via **Actions → Run workflow**, ou:
+
+```bash
+gh workflow run monitor.yml -f initial_notify=false -f send_daily_summary=true
+gh run list --limit 3      # acompanha
+gh run view --log          # lê o log da última execução
+```
 
 ### O que o workflow faz
 
 1. Faz checkout do repositório.
 2. Instala Python 3.12 e dependências.
-3. Executa os testes com `pytest`.
-4. Executa o monitor (`src/main.py`).
-5. Verifica se `data/bootcamps.json` foi alterado.
-6. Se sim, commita e faz push com a mensagem `chore(monitor): atualiza histórico de bootcamps [skip ci]`.
+3. Executa a suíte de testes — **se falhar, o monitor não roda**.
+4. Executa o monitor (`src/main.py`), com os secrets vindos do ambiente.
+5. Verifica se `data/bootcamps.json` mudou.
+6. Se mudou, commita e faz push como `github-actions[bot]`, com `[skip ci]`
+   na mensagem para não disparar o workflow de novo.
 
-O workflow usa `concurrency` para evitar duas execuções simultâneas.
+O `concurrency` impede duas execuções simultâneas.
+
+### Duas coisas para saber
+
+**O commit diário é esperado.** O histórico muda a cada execução, nem que seja
+só o `last_checked_at`, então quase sempre há um commit automático — mesmo em
+dia sem novidade. Não é sinal de que algo mudou na DIO; para isso, olhe o
+Telegram.
+
+**O GitHub desativa cron por inatividade.** Workflows agendados param
+automaticamente após 60 dias sem atividade no repositório. Você recebe um
+e-mail e reativa com um clique. Os commits automáticos do próprio bot ajudam a
+manter o repositório ativo.
+
+Em repositório **público**, o Actions é gratuito e ilimitado nos runners padrão.
+Em privado, consome da cota mensal do plano (2.000 min no Free) — a execução
+diária leva menos de um minuto, então cabe folgado nos dois casos.
 
 ---
 
