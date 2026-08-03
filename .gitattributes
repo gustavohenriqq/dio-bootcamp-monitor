@@ -1,0 +1,13 @@
+# Normaliza fins de linha: LF no repositório, independente do SO de origem.
+# Sem isso, um commit feito no Windows (CRLF) contra um workflow que roda em
+# Ubuntu (LF) produz diff em arquivo inteiro — inclusive no data/bootcamps.json
+# que o GitHub Actions compara a cada execução.
+* text=auto eol=lf
+
+# Fixtures de HTML precisam bater byte a byte com o que os testes esperam.
+*.html text eol=lf
+
+# Binários: nunca normalizar.
+*.png binary
+*.jpg binary
+*.pdf binary
