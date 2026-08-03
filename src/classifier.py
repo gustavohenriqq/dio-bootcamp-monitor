@@ -1,0 +1,403 @@
+"""
+classifier.py — Classificação contextual da chance de contratação em bootcamps DIO.
+
+A classificação é EXPLICÁVEL: não se baseia apenas na presença isolada de palavras,
+mas analisa frase e contexto ao redor de cada ocorrência.
+
+Classificações possíveis:
+    ALTA        — sinais fortes de processo seletivo ativo para emprego
+    MÉDIA       — sinais moderados de oportunidade de recrutamento
+    BAIXA       — menções vagas de oportunidade sem processo concreto
+    EXPIRADA    — programa antigo ou prazo encerrado
+    INDETERMINADA — sem evidências suficientes
+"""
+
+import hashlib
+import logging
+import re
+from dataclasses import dataclass, field
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constantes de classificação
+# ---------------------------------------------------------------------------
+
+CLASSIFICATION_ALTA = "ALTA"
+CLASSIFICATION_MEDIA = "MÉDIA"
+CLASSIFICATION_BAIXA = "BAIXA"
+CLASSIFICATION_EXPIRADA = "EXPIRADA"
+CLASSIFICATION_INDETERMINADA = "INDETERMINADA"
+
+# ---------------------------------------------------------------------------
+# Resultado do classificador
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ClassificationResult:
+    """Resultado completo da classificação de um bootcamp."""
+
+    classification: str
+    score: int
+    evidences: list[str] = field(default_factory=list)
+    observation: str = ""
+    relevant_excerpt_hash: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "classification": self.classification,
+            "score": self.score,
+            "evidences": self.evidences,
+            "observation": self.observation,
+            "relevant_excerpt_hash": self.relevant_excerpt_hash,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Definição de sinais
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Signal:
+    """Sinal de classificação com padrão regex contextual e pontuação."""
+
+    pattern: re.Pattern
+    points: int
+    label: str
+    # Se True, o sinal é negativo (rebaixa a classificação)
+    is_negative: bool = False
+    # Se definido, o sinal exige que o match NÃO contenha esses termos
+    # (para evitar falsos positivos no contexto imediato)
+    exclude_context_patterns: list[re.Pattern] = field(default_factory=list)
+
+
+def _compile(pattern: str, flags: int = re.IGNORECASE) -> re.Pattern:
+    return re.compile(pattern, flags)
+
+
+# Sinais fortes (+50 a +15)
+STRONG_SIGNALS: list[Signal] = [
+    Signal(
+        pattern=_compile(r"processo\s+seletivo\s+(ativo|aberto|para|em\s+andamento)"),
+        points=50,
+        label="processo seletivo ativo",
+    ),
+    Signal(
+        pattern=_compile(r"primeira\s+etapa\s+do\s+processo\s+seletivo"),
+        points=50,
+        label="primeira etapa do processo seletivo",
+    ),
+    Signal(
+        pattern=_compile(r"\d+\s+vagas?\s+(de\s+emprego|disponíveis?|abertas?|para\s+contrata)"),
+        points=50,
+        label="vagas de emprego disponíveis (quantidade informada)",
+        exclude_context_patterns=[
+            _compile(r"vagas?\s+gratuitas?"),
+            _compile(r"vagas?\s+no\s+curso"),
+            _compile(r"vagas?\s+no\s+bootcamp"),
+        ],
+    ),
+    Signal(
+        pattern=_compile(r"vagas?\s+(de\s+emprego|disponíveis?\s+para\s+contrata)"),
+        points=50,
+        label="vagas de emprego disponíveis",
+        exclude_context_patterns=[
+            _compile(r"vagas?\s+gratuitas?"),
+            _compile(r"vagas?\s+no\s+curso"),
+            _compile(r"vagas?\s+no\s+bootcamp"),
+            _compile(r"vagas?\s+limitadas?"),
+        ],
+    ),
+    Signal(
+        pattern=_compile(r"contrata(ção|r)\s+(pela|pela empresa|direta)"),
+        points=50,
+        label="contratação pela empresa",
+    ),
+    Signal(
+        pattern=_compile(r"recrutadores?\s+(da empresa\s+)?(acompanhar|acompanharão|estarão\s+presentes?)"),
+        points=25,
+        label="recrutadores acompanharão os participantes",
+    ),
+    Signal(
+        pattern=_compile(r"candidatos?\s+selecionados?"),
+        points=30,
+        label="candidatos selecionados",
+    ),
+    Signal(
+        pattern=_compile(r"teste\s+de\s+nivelamento\s+(para\s+vagas?|para\s+seleção)"),
+        points=20,
+        label="teste de nivelamento para vagas",
+    ),
+    Signal(
+        pattern=_compile(r"entrevistas?\s+(com\s+a\s+empresa|técnica|de\s+emprego|para\s+contrata)"),
+        points=25,
+        label="entrevistas com a empresa",
+    ),
+    Signal(
+        pattern=_compile(r"prazo\s+(para\s+participar|de\s+inscrição|para\s+participação)\s+da\s+seleção"),
+        points=15,
+        label="prazo para participar da seleção",
+    ),
+    Signal(
+        pattern=_compile(r"(requisitos?\s+(acadêmicos?|de\s+formação|de\s+localização)\s+(para\s+a?\s*vaga|para\s+concorrer))"),
+        points=15,
+        label="requisitos de contratação",
+    ),
+]
+
+# Sinais médios (+25 a +10)
+MEDIUM_SIGNALS: list[Signal] = [
+    Signal(
+        pattern=_compile(r"possibilidade\s+(real\s+de\s+)?contrata"),
+        points=20,
+        label="possibilidade real de contratação",
+    ),
+    Signal(
+        pattern=_compile(r"entrevistas?\s+mapeadas?"),
+        points=20,
+        label="entrevistas mapeadas",
+    ),
+    Signal(
+        pattern=_compile(r"recrutadores?\s+(poderão|podem)\s+acessar"),
+        points=20,
+        label="recrutadores poderão acessar os destaques",
+    ),
+    Signal(
+        pattern=_compile(r"destaque\s+para\s+oportunidades"),
+        points=15,
+        label="destaque para oportunidades",
+    ),
+    Signal(
+        pattern=_compile(r"conexão\s+direta\s+com\s+recrutamento"),
+        points=20,
+        label="conexão direta com recrutamento",
+    ),
+    Signal(
+        pattern=_compile(r"(evento|mentoria)\s+(específica?|com)\s+(o\s+)?RH"),
+        points=15,
+        label="evento/mentoria com RH",
+    ),
+]
+
+# Sinais fracos (+5 a +1)
+WEAK_SIGNALS: list[Signal] = [
+    Signal(
+        pattern=_compile(r"talent\s+match"),
+        points=5,
+        label="perfil disponível na Talent Match",
+    ),
+    Signal(
+        pattern=_compile(r"oportunidades?\s+em\s+empresas?\s+parceiras?"),
+        points=3,
+        label="oportunidades em empresas parceiras",
+    ),
+    Signal(
+        pattern=_compile(r"aumente\s+suas\s+chances?"),
+        points=2,
+        label="aumente suas chances",
+    ),
+    Signal(
+        pattern=_compile(r"certificado\s+(para\s+o\s+)?currículo"),
+        points=1,
+        label="certificado para o currículo",
+    ),
+    Signal(
+        pattern=_compile(r"destaque\s+seu\s+perfil"),
+        points=2,
+        label="destaque seu perfil",
+    ),
+]
+
+# Sinais negativos (–100 a –80): indicam programa expirado
+NEGATIVE_SIGNALS: list[Signal] = [
+    Signal(
+        pattern=_compile(r"inscrições?\s+(encerradas?|foram\s+encerradas?)"),
+        points=-100,
+        label="prazo de inscrição encerrado",
+        is_negative=True,
+    ),
+    Signal(
+        pattern=_compile(r"seleção\s+(encerrada|finalizada|concluída)"),
+        points=-100,
+        label="processo seletivo encerrado",
+        is_negative=True,
+    ),
+    Signal(
+        pattern=_compile(r"processo\s+seletivo\s+(de\s+)?(20[0-2][0-9])"),
+        points=-80,
+        label="processo seletivo de ano anterior",
+        is_negative=True,
+    ),
+    Signal(
+        pattern=_compile(r"edição\s+(de\s+)?(20[0-2][0-9])\b"),
+        points=-80,
+        label="edição de ano anterior",
+        is_negative=True,
+    ),
+    Signal(
+        pattern=_compile(r"prazo\s+de\s+seleção\s+já\s+venceu"),
+        points=-100,
+        label="prazo de seleção vencido",
+        is_negative=True,
+    ),
+    Signal(
+        pattern=_compile(r"depoimentos?\s+de\s+(ex-?alunos?|conclusão)"),
+        points=-30,
+        label="depoimentos de conclusão (indicativo de edição antiga)",
+        is_negative=True,
+    ),
+]
+
+# Falsos positivos explícitos — contextos que NÃO indicam emprego
+FALSE_POSITIVE_PATTERNS: list[re.Pattern] = [
+    _compile(r"vagas?\s+gratuitas?\s+(para\s+o\s+bootcamp|no\s+bootcamp|no\s+curso|do\s+curso)"),
+    _compile(r"vagas?\s+gratuitas?\s+para\s+participa"),
+    _compile(r"\d+\s+vagas?\s+gratuitas?"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Funções auxiliares
+# ---------------------------------------------------------------------------
+
+def _extract_context(text: str, match: re.Match, window: int = 120) -> str:
+    """Extrai janela de contexto ao redor de um match."""
+    start = max(0, match.start() - window)
+    end = min(len(text), match.end() + window)
+    return text[start:end].strip()
+
+
+def _is_false_positive(context: str) -> bool:
+    """Verifica se o contexto corresponde a um falso positivo conhecido."""
+    for pat in FALSE_POSITIVE_PATTERNS:
+        if pat.search(context):
+            return True
+    return False
+
+
+def _check_exclude_context(context: str, signal: Signal) -> bool:
+    """Verifica se o contexto possui padrões de exclusão do sinal."""
+    for exc_pat in signal.exclude_context_patterns:
+        if exc_pat.search(context):
+            return True
+    return False
+
+
+def _compute_hash(evidences: list[str]) -> str:
+    """Gera hash curto e determinístico das evidências."""
+    joined = "|".join(sorted(evidences))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
+
+
+# ---------------------------------------------------------------------------
+# Classificador principal
+# ---------------------------------------------------------------------------
+
+def classify(text: str) -> ClassificationResult:
+    """
+    Classifica a chance de contratação de um bootcamp com base no texto da página.
+
+    Args:
+        text: texto extraído da página de detalhes do bootcamp.
+
+    Returns:
+        ClassificationResult com classificação, pontuação, evidências e hash.
+    """
+    if not text or not text.strip():
+        return ClassificationResult(
+            classification=CLASSIFICATION_INDETERMINADA,
+            score=0,
+            observation="Texto vazio ou indisponível.",
+        )
+
+    score = 0
+    evidences: list[str] = []
+    negative_evidences: list[str] = []
+    total_negative = 0
+
+    # Verifica sinais negativos primeiro
+    for signal in NEGATIVE_SIGNALS:
+        for match in signal.pattern.finditer(text):
+            context = _extract_context(text, match)
+            score += signal.points  # pontos negativos
+            total_negative += abs(signal.points)
+            snippet = context[:100].replace("\n", " ").strip()
+            negative_evidences.append(f"[{signal.label}] {snippet}")
+
+    # Verifica sinais fortes
+    for signal in STRONG_SIGNALS:
+        for match in signal.pattern.finditer(text):
+            context = _extract_context(text, match)
+            # Checa falsos positivos e exclusões de contexto
+            if _is_false_positive(context) or _check_exclude_context(context, signal):
+                logger.debug("Sinal '%s' ignorado por falso positivo no contexto.", signal.label)
+                continue
+            score += signal.points
+            snippet = context[:100].replace("\n", " ").strip()
+            evidences.append(f"[{signal.label}] {snippet}")
+
+    # Verifica sinais médios
+    for signal in MEDIUM_SIGNALS:
+        for match in signal.pattern.finditer(text):
+            context = _extract_context(text, match)
+            if _is_false_positive(context):
+                continue
+            score += signal.points
+            snippet = context[:100].replace("\n", " ").strip()
+            evidences.append(f"[{signal.label}] {snippet}")
+
+    # Verifica sinais fracos
+    for signal in WEAK_SIGNALS:
+        for match in signal.pattern.finditer(text):
+            context = _extract_context(text, match)
+            if _is_false_positive(context):
+                continue
+            score += signal.points
+            snippet = context[:80].replace("\n", " ").strip()
+            evidences.append(f"[{signal.label}] {snippet}")
+
+    # Deduplica evidências mantendo ordem
+    seen: set[str] = set()
+    unique_evidences: list[str] = []
+    for ev in evidences:
+        key = ev[:60]
+        if key not in seen:
+            seen.add(key)
+            unique_evidences.append(ev)
+
+    all_evidences = negative_evidences + unique_evidences
+
+    # Determina classificação
+    if total_negative >= 80:
+        classification = CLASSIFICATION_EXPIRADA
+        observation = "Sinais de programa expirado ou processo seletivo encerrado."
+    elif score >= 60:
+        classification = CLASSIFICATION_ALTA
+        observation = "Sinais fortes de processo seletivo ativo para contratação."
+    elif score >= 20:
+        classification = CLASSIFICATION_MEDIA
+        observation = "Sinais moderados de oportunidade de recrutamento."
+    elif score >= 3:
+        classification = CLASSIFICATION_BAIXA
+        observation = "Menções vagas de oportunidade sem processo concreto identificado."
+    else:
+        classification = CLASSIFICATION_INDETERMINADA
+        observation = "Sem evidências suficientes de oportunidade de contratação."
+
+    excerpt_hash = _compute_hash(all_evidences) if all_evidences else ""
+
+    logger.debug(
+        "Classificação: %s | Score: %d | Evidências: %d",
+        classification,
+        score,
+        len(all_evidences),
+    )
+
+    return ClassificationResult(
+        classification=classification,
+        score=score,
+        evidences=all_evidences[:8],  # limita para não poluir a mensagem
+        observation=observation,
+        relevant_excerpt_hash=excerpt_hash,
+    )
