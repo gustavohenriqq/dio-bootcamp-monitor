@@ -179,12 +179,17 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
         # Prioriza novos bootcamps para detalhe
         bootcamps_to_detail: list[CatalogBootcamp] = list(new_bootcamps)
 
-        # Adiciona conhecidos com chance de atualização relevante
-        for bc in known_bootcamps:
-            existing = history.get(bc.stable_id)
-            if existing and existing.notification_status == "sent":
-                # Pode ter atualizado — inclui para reclassificação se tiver slot
-                bootcamps_to_detail.append(bc)
+        # Adiciona conhecidos com chance de atualização relevante, do menos
+        # recentemente verificado para o mais recente. Sem essa ordenação, os
+        # slots restantes de MAX_DETAIL_PAGES seriam sempre consumidos pelos
+        # mesmos primeiros bootcamps do catálogo e mudanças no restante da
+        # lista nunca seriam detectadas.
+        recheck_candidates = [
+            bc for bc in known_bootcamps
+            if (existing := history.get(bc.stable_id)) and existing.notification_status == "sent"
+        ]
+        recheck_candidates.sort(key=lambda bc: history[bc.stable_id].last_checked_at or "")
+        bootcamps_to_detail.extend(recheck_candidates)
 
         # Processa bootcamps com detalhe
         for bc in bootcamps_to_detail:
