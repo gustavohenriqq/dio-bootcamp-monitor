@@ -99,6 +99,8 @@ class NewBootcampNotification:
     evidences: list[str]
     observation: str
     identified_at: str
+    deadline: str = ""
+    days_left: Optional[int] = None
 
 
 @dataclass
@@ -129,6 +131,29 @@ class DailySummary:
 # Construção das mensagens
 # ---------------------------------------------------------------------------
 
+def _linha_de_prazo(deadline: str, days_left: Optional[int]) -> str:
+    """
+    Linha de prazo de inscrição, com urgência destacada.
+
+    Retorna string vazia quando não há prazo conhecido, para a mensagem não
+    exibir um campo vago.
+    """
+    if not deadline or days_left is None:
+        return "\n"
+
+    quando = _esc(deadline)
+
+    if days_left < 0:
+        return f"⌛ <b>Inscrições:</b> encerradas em {quando}\n\n"
+    if days_left == 0:
+        return f"🔥 <b>Inscrições:</b> ÚLTIMO DIA ({quando})\n\n"
+    if days_left == 1:
+        return f"🔥 <b>Inscrições:</b> encerram amanhã ({quando})\n\n"
+    if days_left <= 7:
+        return f"🔥 <b>Inscrições:</b> abertas, faltam {days_left} dias ({quando})\n\n"
+    return f"✅ <b>Inscrições:</b> abertas até {quando} ({days_left} dias)\n\n"
+
+
 def _build_new_bootcamp_message(n: NewBootcampNotification) -> str:
     """Constrói mensagem HTML para novo bootcamp."""
     evidences_html = "\n".join(
@@ -140,7 +165,8 @@ def _build_new_bootcamp_message(n: NewBootcampNotification) -> str:
         f"🏢 <b>Empresa:</b> {_esc(n.company) or 'não informada'}\n"
         f"📚 <b>Bootcamp:</b> {_esc(n.name)}\n"
         f"🎯 <b>Chance de contratação:</b> {_esc(n.classification)}\n"
-        f"📊 <b>Pontuação:</b> {n.score}\n\n"
+        f"📊 <b>Pontuação:</b> {n.score}\n"
+        f"{_linha_de_prazo(n.deadline, n.days_left)}\n"
         f"🔎 <b>Evidências:</b>\n{evidences_html}\n\n"
         f"⚠️ <b>Observação:</b> {_esc(_truncate(n.observation, 200))}\n\n"
         f"🔗 <b>Página:</b> {_esc(n.url)}\n"

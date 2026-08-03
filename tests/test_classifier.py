@@ -388,3 +388,113 @@ class TestSinaisDiscriminantes:
             "empresas parceiras da DIO que estão contratando."
         )
         assert r.classification == CLASSIFICATION_BAIXA, f"{r.classification}, score {r.score}"
+
+
+# ---------------------------------------------------------------------------
+# Situação da inscrição a partir do prazo do catálogo
+#
+# O campo `finish` de props.pageProps.bootcamps é data ISO — dado estruturado,
+# não heurística. Em agosto/2026, 212 dos 217 bootcamps do catálogo já tinham
+# vencido, vários ainda de 2021. Sem esse corte, todos geram notificação.
+# ---------------------------------------------------------------------------
+
+from datetime import date
+
+from classifier import (
+    ENROLLMENT_ABERTO,
+    ENROLLMENT_DESCONHECIDO,
+    ENROLLMENT_ENCERRADO,
+    evaluate_enrollment,
+    parse_deadline,
+)
+
+HOJE = date(2026, 8, 3)
+
+
+class TestParseDeadline:
+    def test_iso(self):
+        assert parse_deadline("2026-08-31") == date(2026, 8, 31)
+
+    def test_iso_com_hora(self):
+        assert parse_deadline("2026-08-31T23:59:00Z") == date(2026, 8, 31)
+
+    def test_formato_brasileiro(self):
+        assert parse_deadline("31/08/2026") == date(2026, 8, 31)
+
+    def test_vazio_e_lixo_retornam_none(self):
+        assert parse_deadline("") is None
+        assert parse_deadline("   ") is None
+        assert parse_deadline("em breve") is None
+        assert parse_deadline("2026-13-45") is None
+
+
+class TestEvaluateEnrollment:
+    def test_prazo_futuro_esta_aberto(self):
+        status, dias = evaluate_enrollment("2026-08-31", today=HOJE)
+        assert status == ENROLLMENT_ABERTO
+        assert dias == 28
+
+    def test_ultimo_dia_ainda_conta_como_aberto(self):
+        status, dias = evaluate_enrollment("2026-08-03", today=HOJE)
+        assert status == ENROLLMENT_ABERTO
+        assert dias == 0
+
+    def test_prazo_vencido_esta_encerrado(self):
+        status, dias = evaluate_enrollment("2026-07-31", today=HOJE)
+        assert status == ENROLLMENT_ENCERRADO
+        assert dias == -3
+
+    def test_sem_prazo_fica_desconhecido(self):
+        status, dias = evaluate_enrollment("", today=HOJE)
+        assert status == ENROLLMENT_DESCONHECIDO
+        assert dias is None
+
+
+class TestPrazoNaClassificacao:
+    TEXTO_FORTE = (
+        "Processo seletivo ativo para 20 vagas de emprego disponíveis. "
+        "Candidatos selecionados farão entrevistas técnicas com a empresa."
+    )
+
+    def test_prazo_vencido_expira_mesmo_com_texto_forte(self):
+        """Não interessa o quão promissora é a página se a inscrição fechou."""
+        r = classify(self.TEXTO_FORTE, deadline="2021-04-14", today=HOJE)
+        assert r.classification == CLASSIFICATION_EXPIRADA, (
+            f"Bootcamp de 2021 não pode ser {r.classification}."
+        )
+        assert r.enrollment_status == ENROLLMENT_ENCERRADO
+        assert not r.is_open
+
+    def test_prazo_aberto_preserva_a_classificacao(self):
+        r = classify(self.TEXTO_FORTE, deadline="2026-09-08", today=HOJE)
+        assert r.classification == CLASSIFICATION_ALTA
+        assert r.is_open
+        assert r.days_left == 36
+
+    def test_sem_prazo_nao_filtra_nada(self):
+        """Prazo ausente não pode ser tratado como vencido."""
+        r = classify(self.TEXTO_FORTE, deadline="", today=HOJE)
+        assert r.classification == CLASSIFICATION_ALTA
+        assert r.enrollment_status == ENROLLMENT_DESCONHECIDO
+
+    def test_prazo_invalido_nao_filtra_nada(self):
+        r = classify(self.TEXTO_FORTE, deadline="data indefinida", today=HOJE)
+        assert r.classification == CLASSIFICATION_ALTA
+        assert r.enrollment_status == ENROLLMENT_DESCONHECIDO
+
+    def test_observacao_informa_quando_encerrou(self):
+        r = classify(self.TEXTO_FORTE, deadline="2026-07-31", today=HOJE)
+        assert "31/07/2026" in r.observation
+        assert "encerrada" in r.observation.lower()
+
+    def test_observacao_informa_dias_restantes(self):
+        r = classify(self.TEXTO_FORTE, deadline="2026-08-10", today=HOJE)
+        assert "7 dias" in r.observation
+
+    def test_texto_vazio_com_prazo_vencido_expira(self):
+        r = classify("", deadline="2022-01-01", today=HOJE)
+        assert r.classification == CLASSIFICATION_EXPIRADA
+
+    def test_texto_vazio_sem_prazo_fica_indeterminada(self):
+        r = classify("", deadline="", today=HOJE)
+        assert r.classification == CLASSIFICATION_INDETERMINADA

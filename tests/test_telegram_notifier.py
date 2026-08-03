@@ -214,3 +214,51 @@ class TestBuildNotifier:
         ) is True
         assert n.send_daily_summary(DailySummary(0, 0, 0, 0, 0, 0)) is True
         n.close()
+
+
+# ---------------------------------------------------------------------------
+# Linha de prazo na mensagem
+# ---------------------------------------------------------------------------
+
+from telegram_notifier import _build_new_bootcamp_message
+
+
+def notif(deadline="", days_left=None):
+    return NewBootcampNotification(
+        name="Bootcamp Teste", company="Empresa", url="https://www.dio.me/bootcamp/x",
+        classification="ALTA", score=60, evidences=["evidência"],
+        observation="obs", identified_at="03/08/2026",
+        deadline=deadline, days_left=days_left,
+    )
+
+
+class TestLinhaDePrazo:
+    def test_prazo_confortavel(self):
+        msg = _build_new_bootcamp_message(notif("08/09/2026", 36))
+        assert "abertas até 08/09/2026" in msg
+        assert "36 dias" in msg
+
+    def test_prazo_urgente_destaca(self):
+        msg = _build_new_bootcamp_message(notif("10/08/2026", 7))
+        assert "🔥" in msg
+        assert "faltam 7 dias" in msg
+
+    def test_ultimo_dia(self):
+        msg = _build_new_bootcamp_message(notif("03/08/2026", 0))
+        assert "ÚLTIMO DIA" in msg
+
+    def test_encerra_amanha(self):
+        assert "amanhã" in _build_new_bootcamp_message(notif("04/08/2026", 1))
+
+    def test_encerrado(self):
+        msg = _build_new_bootcamp_message(notif("14/04/2021", -1937))
+        assert "encerradas em 14/04/2021" in msg
+
+    def test_sem_prazo_omite_a_linha(self):
+        """Sem prazo conhecido, a mensagem não deve exibir campo vago."""
+        msg = _build_new_bootcamp_message(notif())
+        assert "Inscrições" not in msg
+
+    def test_prazo_e_escapado(self):
+        msg = _build_new_bootcamp_message(notif("<b>hack</b>", 5))
+        assert "<b>hack</b>" not in msg.split("Inscrições")[1][:60]

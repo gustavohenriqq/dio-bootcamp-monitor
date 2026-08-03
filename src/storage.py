@@ -48,6 +48,9 @@ class BootcampRecord:
     relevant_excerpt_hash: str = ""
     previous_classification: str = ""
     update_notification_hashes: list[str] = field(default_factory=list)
+    # Situação da inscrição derivada do prazo do catálogo (campo `finish`).
+    enrollment_status: str = "DESCONHECIDO"
+    days_left: Optional[int] = None
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +72,8 @@ class BootcampRecord:
             "relevant_excerpt_hash": self.relevant_excerpt_hash,
             "previous_classification": self.previous_classification,
             "update_notification_hashes": self.update_notification_hashes,
+            "enrollment_status": self.enrollment_status,
+            "days_left": self.days_left,
         }
 
     @classmethod
@@ -92,6 +97,8 @@ class BootcampRecord:
             relevant_excerpt_hash=data.get("relevant_excerpt_hash", ""),
             previous_classification=data.get("previous_classification", ""),
             update_notification_hashes=data.get("update_notification_hashes", []),
+            enrollment_status=data.get("enrollment_status", "DESCONHECIDO"),
+            days_left=data.get("days_left"),
         )
 
 
@@ -228,6 +235,8 @@ def upsert_record(
     existing.catalog_summary = record.catalog_summary
     existing.status = record.status
     existing.launch_info = record.launch_info
+    existing.enrollment_status = record.enrollment_status
+    existing.days_left = record.days_left
 
     return False, changed
 
