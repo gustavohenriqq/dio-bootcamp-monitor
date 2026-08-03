@@ -520,3 +520,68 @@ class TestRotacaoDeRechecagem:
             f"A segunda execução repetiu bootcamps da primeira: {primeira} vs {segunda}"
         )
         assert len(set(primeira) | set(segunda)) == 4
+
+
+# ---------------------------------------------------------------------------
+# Prazo vencido sai da fila de rechecagem
+#
+# Com 212 dos 217 bootcamps ja encerrados, mante-los na rotacao gastaria os
+# slots diarios de MAX_DETAIL_PAGES em programas mortos e adiaria por semanas
+# a reverificacao dos poucos que ainda aceitam inscricao.
+# ---------------------------------------------------------------------------
+
+class TestRechecagemIgnoraPrazoVencido:
+    def _rodar(self, tmp_path, bootcamps, max_detail_pages=5):
+        from main import run
+
+        storage_path = tmp_path / "bootcamps.json"
+        history = {}
+        catalog = []
+        for sid, prazo, checado in bootcamps:
+            history[sid] = BootcampRecord(
+                stable_id=sid, name=f"Bootcamp {sid}", company="Empresa",
+                url=f"https://www.dio.me/bootcamp/{sid}",
+                first_seen_at="2026-01-01T00:00:00-03:00",
+                last_checked_at=checado, classification="BAIXA", score=10,
+                evidences=[], notification_status="sent", launch_info=prazo,
+            )
+            catalog.append(CatalogBootcamp(
+                stable_id=sid, name=f"Bootcamp {sid}", company="Empresa",
+                url=f"https://www.dio.me/bootcamp/{sid}",
+                summary="", launch_info=prazo, catalog_position=0,
+            ))
+        save_history(history, storage_path)
+
+        with patch("main.DioScraper") as MockScraper, \
+             patch("main.build_notifier") as MockNotifier:
+            mock_scraper = MagicMock()
+            mock_scraper.fetch_catalog.return_value = catalog
+            mock_scraper.fetch_detail.return_value = DETAIL_TEXT_BAIXA
+            MockScraper.return_value = mock_scraper
+            MockNotifier.return_value = MagicMock()
+            run(make_config(max_detail_pages=max_detail_pages), storage_path)
+            return [c.args[0] for c in mock_scraper.fetch_detail.call_args_list]
+
+    def test_encerrado_nao_e_rechecado(self, tmp_path):
+        urls = self._rodar(tmp_path, [
+            ("bc-vencido-antigo", "2021-04-14", "2020-01-01T00:00:00-03:00"),
+            ("bc-aberto-futuro", "2099-12-31", "2026-08-01T00:00:00-03:00"),
+        ])
+        assert urls == ["https://www.dio.me/bootcamp/bc-aberto-futuro"], (
+            "O vencido tem last_checked_at muito mais antigo e ainda assim nao "
+            f"deveria consumir slot. Buscados: {urls}"
+        )
+
+    def test_sem_prazo_continua_sendo_rechecado(self, tmp_path):
+        """Falta de dado nao pode excluir um bootcamp do monitoramento."""
+        urls = self._rodar(tmp_path, [
+            ("bc-sem-prazo-def", "", "2026-01-01T00:00:00-03:00"),
+        ])
+        assert urls == ["https://www.dio.me/bootcamp/bc-sem-prazo-def"]
+
+    def test_todos_vencidos_nao_busca_nada(self, tmp_path):
+        urls = self._rodar(tmp_path, [
+            ("bc-vencido-um", "2021-01-31", "2020-01-01T00:00:00-03:00"),
+            ("bc-vencido-dois", "2022-02-08", "2020-01-01T00:00:00-03:00"),
+        ])
+        assert urls == []
