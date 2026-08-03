@@ -16,6 +16,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,19 @@ CLASSIFICATION_EXPIRADA = "EXPIRADA"
 CLASSIFICATION_INDETERMINADA = "INDETERMINADA"
 
 # ---------------------------------------------------------------------------
+# Situação da inscrição
+#
+# Vem do campo `finish` do catálogo (props.pageProps.bootcamps), que é uma data
+# ISO — dado estruturado, muito mais confiável que heurística sobre o texto da
+# página. Por isso o prazo vencido prevalece sobre a pontuação: não adianta a
+# página falar de processo seletivo se as inscrições fecharam em 2021.
+# ---------------------------------------------------------------------------
+
+ENROLLMENT_ABERTO = "ABERTO"
+ENROLLMENT_ENCERRADO = "ENCERRADO"
+ENROLLMENT_DESCONHECIDO = "DESCONHECIDO"
+
+# ---------------------------------------------------------------------------
 # Resultado do classificador
 # ---------------------------------------------------------------------------
 
@@ -43,6 +57,15 @@ class ClassificationResult:
     evidences: list[str] = field(default_factory=list)
     observation: str = ""
     relevant_excerpt_hash: str = ""
+    # Situação da inscrição, derivada do prazo do catálogo (não do texto).
+    enrollment_status: str = ENROLLMENT_DESCONHECIDO
+    days_left: Optional[int] = None
+    deadline: str = ""
+
+    @property
+    def is_open(self) -> bool:
+        """True apenas quando há prazo conhecido e ele ainda não venceu."""
+        return self.enrollment_status == ENROLLMENT_ABERTO
 
     def to_dict(self) -> dict:
         return {
@@ -51,6 +74,9 @@ class ClassificationResult:
             "evidences": self.evidences,
             "observation": self.observation,
             "relevant_excerpt_hash": self.relevant_excerpt_hash,
+            "enrollment_status": self.enrollment_status,
+            "days_left": self.days_left,
+            "deadline": self.deadline,
         }
 
 
@@ -359,6 +385,88 @@ def _check_exclude_context(context: str, signal: Signal) -> bool:
     return False
 
 
+def parse_deadline(raw: str) -> Optional[date]:
+    """
+    Converte o prazo do catálogo em data.
+
+    Aceita ISO (2026-08-31, e também com hora) e o formato brasileiro
+    (31/08/2026). Retorna None para vazio ou irreconhecível — nesse caso a
+    situação da inscrição fica DESCONHECIDO e nada é filtrado por prazo.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+
+    # ISO, com ou sem componente de hora
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", raw)
+    if match:
+        try:
+            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except ValueError:
+            return None
+
+    # Formato brasileiro
+    match = re.match(r"^(\d{2})/(\d{2})/(\d{4})$", raw)
+    if match:
+        try:
+            return date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+        except ValueError:
+            return None
+
+    logger.debug("Prazo em formato não reconhecido: %r", raw[:40])
+    return None
+
+
+def evaluate_enrollment(raw_deadline: str, today: Optional[date] = None) -> tuple[str, Optional[int]]:
+    """
+    Determina a situação da inscrição a partir do prazo.
+
+    Args:
+        raw_deadline: prazo como vem do catálogo.
+        today: data de referência; padrão é hoje.
+
+    Returns:
+        (situação, dias restantes). Dias restantes é None quando não há prazo
+        conhecido, 0 no último dia e negativo depois de vencido.
+    """
+    prazo = parse_deadline(raw_deadline)
+    if prazo is None:
+        return ENROLLMENT_DESCONHECIDO, None
+
+    hoje = today or date.today()
+    dias = (prazo - hoje).days
+
+    if dias < 0:
+        return ENROLLMENT_ENCERRADO, dias
+    return ENROLLMENT_ABERTO, dias
+
+
+def _formata_data(raw: str) -> str:
+    """Formata o prazo para exibição (DD/MM/AAAA), com fallback para o original."""
+    prazo = parse_deadline(raw)
+    return prazo.strftime("%d/%m/%Y") if prazo else (raw or "").strip()
+
+
+def _observacao_de_prazo(status: str, days_left: Optional[int], raw_deadline: str) -> str:
+    """Frase legível sobre a situação da inscrição."""
+    quando = _formata_data(raw_deadline)
+
+    if status == ENROLLMENT_ENCERRADO:
+        dias = abs(days_left) if days_left is not None else None
+        if dias is not None and dias < 365:
+            return f"Inscrições encerradas em {quando} (há {dias} dias)."
+        return f"Inscrições encerradas em {quando}."
+
+    if status == ENROLLMENT_ABERTO:
+        if days_left == 0:
+            return f"Último dia de inscrição: {quando}."
+        if days_left == 1:
+            return f"Inscrições encerram amanhã ({quando})."
+        return f"Inscrições abertas até {quando} ({days_left} dias restantes)."
+
+    return ""
+
+
 def _compute_hash(evidences: list[str]) -> str:
     """Gera hash curto e determinístico das evidências."""
     joined = "|".join(sorted(evidences))
@@ -369,21 +477,41 @@ def _compute_hash(evidences: list[str]) -> str:
 # Classificador principal
 # ---------------------------------------------------------------------------
 
-def classify(text: str) -> ClassificationResult:
+def classify(
+    text: str,
+    deadline: str = "",
+    today: Optional[date] = None,
+) -> ClassificationResult:
     """
     Classifica a chance de contratação de um bootcamp com base no texto da página.
 
     Args:
         text: texto extraído da página de detalhes do bootcamp.
+        deadline: prazo do catálogo (campo `finish`). Quando informado e já
+            vencido, a classificação é EXPIRADA independentemente da pontuação.
+        today: data de referência para o prazo; padrão é hoje.
 
     Returns:
         ClassificationResult com classificação, pontuação, evidências e hash.
     """
+    enrollment_status, days_left = evaluate_enrollment(deadline, today)
+
     if not text or not text.strip():
         return ClassificationResult(
-            classification=CLASSIFICATION_INDETERMINADA,
+            classification=(
+                CLASSIFICATION_EXPIRADA
+                if enrollment_status == ENROLLMENT_ENCERRADO
+                else CLASSIFICATION_INDETERMINADA
+            ),
             score=0,
-            observation="Texto vazio ou indisponível.",
+            observation=(
+                _observacao_de_prazo(enrollment_status, days_left, deadline)
+                if enrollment_status == ENROLLMENT_ENCERRADO
+                else "Texto vazio ou indisponível."
+            ),
+            enrollment_status=enrollment_status,
+            days_left=days_left,
+            deadline=(deadline or "").strip(),
         )
 
     score = 0
@@ -434,8 +562,16 @@ def classify(text: str) -> ClassificationResult:
 
     all_evidences = negative_evidences + unique_evidences
 
-    # Determina classificação
-    if total_negative >= 80:
+    # Determina classificação.
+    #
+    # O prazo do catálogo vem antes de tudo: é data estruturada, não heurística.
+    # Um bootcamp cujas inscrições fecharam não interessa por mais promissor que
+    # o texto pareça — 212 dos 217 bootcamps do catálogo já venceram, vários
+    # ainda de 2021, e sem esse corte todos eles geram notificação.
+    if enrollment_status == ENROLLMENT_ENCERRADO:
+        classification = CLASSIFICATION_EXPIRADA
+        observation = _observacao_de_prazo(enrollment_status, days_left, deadline)
+    elif total_negative >= 80:
         classification = CLASSIFICATION_EXPIRADA
         observation = "Sinais de programa expirado ou processo seletivo encerrado."
     elif score >= 45:
@@ -464,10 +600,18 @@ def classify(text: str) -> ClassificationResult:
         len(all_evidences),
     )
 
+    # Acrescenta o prazo à observação quando a inscrição segue aberta, para a
+    # notificação dizer quanto tempo resta.
+    if enrollment_status == ENROLLMENT_ABERTO:
+        observation = f"{observation} {_observacao_de_prazo(enrollment_status, days_left, deadline)}".strip()
+
     return ClassificationResult(
         classification=classification,
         score=score,
         evidences=all_evidences[:8],  # limita para não poluir a mensagem
         observation=observation,
         relevant_excerpt_hash=excerpt_hash,
+        enrollment_status=enrollment_status,
+        days_left=days_left,
+        deadline=(deadline or "").strip(),
     )

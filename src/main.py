@@ -28,6 +28,7 @@ from classifier import (
     CLASSIFICATION_MEDIA,
     CLASSIFICATION_BAIXA,
     classify,
+    parse_deadline,
 )
 from dio_scraper import CatalogBootcamp, DioScraper
 from storage import (
@@ -209,7 +210,9 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
                 logger.warning("Erro ao buscar detalhe de '%s': %s. Continuando.", bc.name, exc)
 
             # Classifica
-            result = classify(detail_text) if detail_text else classify(bc.summary)
+            # O prazo do catálogo entra na classificação: bootcamp com inscrição
+            # encerrada vira EXPIRADA e não gera notificação.
+            result = classify(detail_text or bc.summary, deadline=bc.launch_info)
 
             now = _now_iso()
 
@@ -232,6 +235,8 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
                     launch_info=bc.launch_info,
                     observation=result.observation,
                     relevant_excerpt_hash=result.relevant_excerpt_hash,
+                    enrollment_status=result.enrollment_status,
+                    days_left=result.days_left,
                 )
                 upsert_record(history, record)
 
@@ -270,6 +275,8 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
                     launch_info=bc.launch_info,
                     observation=result.observation,
                     relevant_excerpt_hash=result.relevant_excerpt_hash,
+                    enrollment_status=result.enrollment_status,
+                    days_left=result.days_left,
                 )
 
                 _, was_updated = upsert_record(history, record_update)
@@ -288,7 +295,7 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
                 continue  # já processado acima
 
             now = _now_iso()
-            result = classify(bc.summary)
+            result = classify(bc.summary, deadline=bc.launch_info)
             record = BootcampRecord(
                 stable_id=bc.stable_id,
                 name=bc.name,
@@ -306,6 +313,8 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
                 launch_info=bc.launch_info,
                 observation=result.observation,
                 relevant_excerpt_hash=result.relevant_excerpt_hash,
+                enrollment_status=result.enrollment_status,
+                days_left=result.days_left,
             )
             upsert_record(history, record)
             new_count += 1
@@ -372,6 +381,12 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
 # Helpers de notificação
 # ---------------------------------------------------------------------------
 
+def _formata_prazo(raw: str) -> str:
+    """Formata o prazo do catálogo para exibição na notificação."""
+    prazo = parse_deadline(raw)
+    return prazo.strftime("%d/%m/%Y") if prazo else ""
+
+
 def _notify_new(notifier, record: BootcampRecord, display_time: str) -> None:
     """Envia notificação de novo bootcamp sem propagar erros."""
     try:
@@ -384,6 +399,8 @@ def _notify_new(notifier, record: BootcampRecord, display_time: str) -> None:
             evidences=record.evidences,
             observation=record.observation,
             identified_at=display_time,
+            deadline=_formata_prazo(record.launch_info),
+            days_left=record.days_left,
         )
         notifier.notify_new_bootcamp(notif)
     except Exception as exc:

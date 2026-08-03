@@ -232,6 +232,31 @@ O workflow usa `concurrency` para evitar duas execuções simultâneas.
 
 ---
 
+## Situação da inscrição (prazo)
+
+O catálogo entrega, para cada bootcamp, um campo `finish` com a data limite —
+dado estruturado, não texto. O monitor usa esse prazo como **primeiro filtro**,
+antes de qualquer heurística de classificação:
+
+| Situação | Critério | Efeito |
+| --- | --- | --- |
+| `ABERTO` | prazo ≥ hoje | Classifica normalmente e notifica |
+| `ENCERRADO` | prazo < hoje | Vira `EXPIRADA`, não notifica |
+| `DESCONHECIDO` | sem prazo ou formato irreconhecível | Não filtra nada; classifica normalmente |
+
+O corte importa mais do que parece: em agosto/2026, **212 dos 217 bootcamps do
+catálogo já tinham vencido** — 45 deles ainda de 2021. A DIO mantém os
+encerrados publicados como conteúdo de estudo, então sem o filtro por prazo o
+bot notifica um arquivo inteiro de programas mortos.
+
+Prazo vencido prevalece sobre a pontuação: não adianta a página falar de
+processo seletivo se as inscrições fecharam há três anos.
+
+A notificação mostra a urgência — `🔥` quando faltam 7 dias ou menos, `✅` acima
+disso, e o campo é omitido quando não há prazo conhecido.
+
+---
+
 ## Interpretação das classificações
 
 | Classificação | Significado |
