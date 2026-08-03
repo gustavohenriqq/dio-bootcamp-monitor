@@ -399,3 +399,124 @@ class TestResumoDiario:
             run(config, storage_path)
 
             mock_notifier.send_daily_summary.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Rotação da rechecagem de bootcamps já conhecidos
+#
+# Os slots restantes de MAX_DETAIL_PAGES precisam rotacionar entre os conhecidos.
+# Sem ordenar por last_checked_at, a fila seguia a ordem do catálogo e sempre os
+# mesmos primeiros bootcamps eram rechecados — mudanças no resto da lista nunca
+# seriam detectadas.
+# ---------------------------------------------------------------------------
+
+class TestRotacaoDeRechecagem:
+    def _historico_com_checagens(self, storage_path: Path, checagens: dict) -> None:
+        """Grava um histórico onde cada id tem um last_checked_at conhecido."""
+        history = {}
+        for stable_id, checked_at in checagens.items():
+            history[stable_id] = BootcampRecord(
+                stable_id=stable_id,
+                name=f"Bootcamp {stable_id}",
+                company="Empresa",
+                url=f"https://www.dio.me/bootcamp/{stable_id}",
+                first_seen_at="2026-01-01T00:00:00-03:00",
+                last_checked_at=checked_at,
+                classification="BAIXA",
+                score=10,
+                evidences=[],
+                notification_status="sent",
+            )
+        save_history(history, storage_path)
+
+    def _rodar(self, tmp_path, checagens, ordem_catalogo, max_detail_pages):
+        from main import run
+
+        storage_path = tmp_path / "bootcamps.json"
+        self._historico_com_checagens(storage_path, checagens)
+
+        catalog = [
+            make_catalog_bootcamp(
+                stable_id=sid,
+                name=f"Bootcamp {sid}",
+                url=f"https://www.dio.me/bootcamp/{sid}",
+            )
+            for sid in ordem_catalogo
+        ]
+
+        with patch("main.DioScraper") as MockScraper, \
+             patch("main.build_notifier") as MockNotifier:
+
+            mock_scraper = MagicMock()
+            mock_scraper.fetch_catalog.return_value = catalog
+            mock_scraper.fetch_detail.return_value = DETAIL_TEXT_BAIXA
+            MockScraper.return_value = mock_scraper
+            MockNotifier.return_value = MagicMock()
+
+            run(make_config(max_detail_pages=max_detail_pages), storage_path)
+
+            return [c.args[0] for c in mock_scraper.fetch_detail.call_args_list]
+
+    def test_recheca_os_menos_recentes_primeiro(self, tmp_path):
+        """A ordem do catálogo não deve determinar quem é rechecado."""
+        urls = self._rodar(
+            tmp_path,
+            checagens={
+                "bc-primeiro-catalogo": "2026-08-01T10:00:00-03:00",  # visto ontem
+                "bc-meio-catalogo": "2026-06-01T10:00:00-03:00",      # visto há 2 meses
+                "bc-fim-catalogo": "2026-05-01T10:00:00-03:00",       # o mais antigo
+            },
+            ordem_catalogo=["bc-primeiro-catalogo", "bc-meio-catalogo", "bc-fim-catalogo"],
+            max_detail_pages=2,
+        )
+        assert urls == [
+            "https://www.dio.me/bootcamp/bc-fim-catalogo",
+            "https://www.dio.me/bootcamp/bc-meio-catalogo",
+        ], "Deveria rechecar os dois mais antigos, não os primeiros do catálogo."
+
+    def test_novos_tem_prioridade_sobre_rechecagem(self, tmp_path):
+        """Um bootcamp novo nunca pode perder o slot para uma rechecagem."""
+        urls = self._rodar(
+            tmp_path,
+            checagens={
+                "bc-antigo-conhecido": "2020-01-01T10:00:00-03:00",  # antiquíssimo
+            },
+            ordem_catalogo=["bc-antigo-conhecido", "bc-novo-em-folha"],
+            max_detail_pages=1,
+        )
+        assert urls == ["https://www.dio.me/bootcamp/bc-novo-em-folha"]
+
+    def test_rechecagem_cobre_o_catalogo_em_execucoes_sucessivas(self, tmp_path):
+        """Duas execuções com 2 slots devem cobrir 4 bootcamps distintos."""
+        checagens = {
+            "bc-alfa-teste": "2026-01-01T10:00:00-03:00",
+            "bc-beta-teste": "2026-02-01T10:00:00-03:00",
+            "bc-gama-teste": "2026-03-01T10:00:00-03:00",
+            "bc-delta-teste": "2026-04-01T10:00:00-03:00",
+        }
+        ordem = list(checagens)
+
+        primeira = self._rodar(tmp_path, checagens, ordem, max_detail_pages=2)
+
+        # A segunda execução parte do histórico que a primeira deixou gravado.
+        from main import run
+        storage_path = tmp_path / "bootcamps.json"
+        catalog = [
+            make_catalog_bootcamp(stable_id=sid, name=f"Bootcamp {sid}",
+                                  url=f"https://www.dio.me/bootcamp/{sid}")
+            for sid in ordem
+        ]
+        with patch("main.DioScraper") as MockScraper, \
+             patch("main.build_notifier") as MockNotifier:
+            mock_scraper = MagicMock()
+            mock_scraper.fetch_catalog.return_value = catalog
+            mock_scraper.fetch_detail.return_value = DETAIL_TEXT_BAIXA
+            MockScraper.return_value = mock_scraper
+            MockNotifier.return_value = MagicMock()
+            run(make_config(max_detail_pages=2), storage_path)
+            segunda = [c.args[0] for c in mock_scraper.fetch_detail.call_args_list]
+
+        assert set(primeira).isdisjoint(set(segunda)), (
+            f"A segunda execução repetiu bootcamps da primeira: {primeira} vs {segunda}"
+        )
+        assert len(set(primeira) | set(segunda)) == 4
