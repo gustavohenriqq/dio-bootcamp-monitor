@@ -79,7 +79,10 @@ def _compile(pattern: str, flags: int = re.IGNORECASE) -> re.Pattern:
 # Sinais fortes (+50 a +15)
 STRONG_SIGNALS: list[Signal] = [
     Signal(
-        pattern=_compile(r"processo\s+seletivo\s+(ativo|aberto|para|em\s+andamento)"),
+        pattern=_compile(
+            r"processo\s+seletivo\s+(est[áa]\s+|estar[áa]\s+|segue\s+|continua\s+)?"
+            r"(ativo|aberto|para|em\s+andamento)"
+        ),
         points=50,
         label="processo seletivo ativo",
     ),
@@ -144,6 +147,21 @@ STRONG_SIGNALS: list[Signal] = [
         points=15,
         label="requisitos de contratação",
     ),
+    Signal(
+        pattern=_compile(r"processo\s+seletivo\s+de\s+contrata"),
+        points=50,
+        label="processo seletivo de contratação",
+    ),
+    Signal(
+        pattern=_compile(r"melhores\s+classificados[\w\s,]{0,40}ser[ãa]o\s+selecionados"),
+        points=40,
+        label="melhores classificados seguem no processo",
+    ),
+    Signal(
+        pattern=_compile(r"vagas?\s+afirmativas?"),
+        points=40,
+        label="vagas afirmativas",
+    ),
 ]
 
 # Sinais médios (+25 a +10)
@@ -178,9 +196,34 @@ MEDIUM_SIGNALS: list[Signal] = [
         points=15,
         label="evento/mentoria com RH",
     ),
+    Signal(
+        pattern=_compile(r"gerar\s+chances?\s+de\s+contrata"),
+        points=10,
+        label="programa declara gerar chances de contratação",
+    ),
+    Signal(
+        pattern=_compile(r"perfil\s+para\s+os?\s+recrutadores\s+d[ao]\s+\w+"),
+        points=15,
+        label="perfil exposto aos recrutadores da empresa parceira",
+    ),
 ]
 
 # Sinais fracos (+5 a +1)
+#
+# Aqui moram as frases que a DIO repete em praticamente toda página de bootcamp:
+# a seção "Sua jornada" ("Tenha chances reais de contratação") e o mockup
+# "Você no futuro", que simula uma mensagem de recrutador com nome e vaga
+# fictícios. Medido sobre 65 páginas reais do catálogo (agosto/2026):
+#
+#     "chances reais de contratação"                 64/65 páginas (98%)
+#     "força do perfil"                              38/65 páginas (58%)
+#     "próximas etapas do processo de contratação"   28/65 páginas (43%)
+#
+# Elas indicam de fato a proposta da plataforma, então pontuam — mas com peso
+# baixo. Tratá-las como sinal médio jogaria o catálogo inteiro para MÉDIA e a
+# classificação deixaria de discriminar qualquer coisa. Com peso baixo, uma
+# página que só tem boilerplate sai de INDETERMINADA para BAIXA, que é
+# exatamente "menções vagas de oportunidade sem processo concreto".
 WEAK_SIGNALS: list[Signal] = [
     Signal(
         pattern=_compile(r"talent\s+match"),
@@ -206,6 +249,38 @@ WEAK_SIGNALS: list[Signal] = [
         pattern=_compile(r"destaque\s+seu\s+perfil"),
         points=2,
         label="destaque seu perfil",
+    ),
+    Signal(
+        pattern=_compile(r"chances?\s+reais?\s+de\s+contrata"),
+        points=3,
+        label="programa cita chances reais de contratação",
+    ),
+    Signal(
+        pattern=_compile(r"pr[oó]ximas\s+etapas\s+do\s+processo\s+de\s+contrata"),
+        points=2,
+        label="menção a etapas de processo de contratação",
+    ),
+    Signal(
+        pattern=_compile(r"for[çc]a\s+do\s+perfil"),
+        points=1,
+        label="força do perfil na plataforma",
+    ),
+    Signal(
+        pattern=_compile(r"empresas?\s+(inovadoras?|nacionais?|multinacionais?)\s+(do\s+mercado|podem\s+encontrar)"),
+        points=2,
+        label="exposição a empresas do mercado",
+    ),
+    # Afirmações sobre a plataforma DIO em geral, não sobre este bootcamp ter
+    # processo seletivo. Indicam exposição a recrutadores, e nada além disso.
+    Signal(
+        pattern=_compile(r"empresas?\s+(parceiras?\s+)?(da\s+DIO\s+)?que\s+est[ãa]o\s+contratando"),
+        points=3,
+        label="perfil disponível a empresas parceiras que contratam",
+    ),
+    Signal(
+        pattern=_compile(r"empresas?\s+que\s+(contratam|buscam\s+contratar)"),
+        points=3,
+        label="plataforma expõe perfil a empresas que contratam",
     ),
 ]
 
@@ -325,37 +400,28 @@ def classify(text: str) -> ClassificationResult:
             snippet = context[:100].replace("\n", " ").strip()
             negative_evidences.append(f"[{signal.label}] {snippet}")
 
-    # Verifica sinais fortes
-    for signal in STRONG_SIGNALS:
-        for match in signal.pattern.finditer(text):
-            context = _extract_context(text, match)
-            # Checa falsos positivos e exclusões de contexto
-            if _is_false_positive(context) or _check_exclude_context(context, signal):
-                logger.debug("Sinal '%s' ignorado por falso positivo no contexto.", signal.label)
-                continue
-            score += signal.points
-            snippet = context[:100].replace("\n", " ").strip()
-            evidences.append(f"[{signal.label}] {snippet}")
-
-    # Verifica sinais médios
-    for signal in MEDIUM_SIGNALS:
-        for match in signal.pattern.finditer(text):
-            context = _extract_context(text, match)
-            if _is_false_positive(context):
-                continue
-            score += signal.points
-            snippet = context[:100].replace("\n", " ").strip()
-            evidences.append(f"[{signal.label}] {snippet}")
-
-    # Verifica sinais fracos
-    for signal in WEAK_SIGNALS:
-        for match in signal.pattern.finditer(text):
-            context = _extract_context(text, match)
-            if _is_false_positive(context):
-                continue
-            score += signal.points
-            snippet = context[:80].replace("\n", " ").strip()
-            evidences.append(f"[{signal.label}] {snippet}")
+    # Sinais positivos: cada sinal pontua no MÁXIMO uma vez por página.
+    #
+    # Contar por ocorrência inflava o score de forma imprevisível: o texto que
+    # chega aqui repete trechos (as seções priorizadas do scraper aparecem de
+    # novo dentro do texto completo), então a mesma frase podia render pontos
+    # 2 ou 3 vezes. Além disso, uma frase repetida não é evidência mais forte
+    # do que a mesma frase dita uma vez.
+    for signals, snippet_len in (
+        (STRONG_SIGNALS, 100),
+        (MEDIUM_SIGNALS, 100),
+        (WEAK_SIGNALS, 80),
+    ):
+        for signal in signals:
+            for match in signal.pattern.finditer(text):
+                context = _extract_context(text, match)
+                if _is_false_positive(context) or _check_exclude_context(context, signal):
+                    logger.debug("Sinal '%s' ignorado por falso positivo no contexto.", signal.label)
+                    continue
+                score += signal.points
+                snippet = context[:snippet_len].replace("\n", " ").strip()
+                evidences.append(f"[{signal.label}] {snippet}")
+                break  # sinal já pontuou; próximas ocorrências não somam
 
     # Deduplica evidências mantendo ordem
     seen: set[str] = set()
@@ -372,7 +438,11 @@ def classify(text: str) -> ClassificationResult:
     if total_negative >= 80:
         classification = CLASSIFICATION_EXPIRADA
         observation = "Sinais de programa expirado ou processo seletivo encerrado."
-    elif score >= 60:
+    elif score >= 45:
+        # Calibrado para a escala em que cada sinal pontua uma única vez por
+        # página: um sinal forte sozinho (40 a 50 pontos) já caracteriza ALTA.
+        # O limiar anterior, 60, só fazia sentido quando frases repetidas
+        # somavam pontos várias vezes e inflavam o score.
         classification = CLASSIFICATION_ALTA
         observation = "Sinais fortes de processo seletivo ativo para contratação."
     elif score >= 20:
