@@ -262,3 +262,89 @@ class TestLinhaDePrazo:
     def test_prazo_e_escapado(self):
         msg = _build_new_bootcamp_message(notif("<b>hack</b>", 5))
         assert "<b>hack</b>" not in msg.split("Inscrições")[1][:60]
+
+
+# ---------------------------------------------------------------------------
+# Resumo de bootcamps com inscrição aberta
+# ---------------------------------------------------------------------------
+
+from telegram_notifier import (
+    MAX_DIGEST_ITEMS,
+    MAX_MESSAGE_CHARS,
+    OpenBootcamp,
+    _build_open_digest_message,
+)
+
+
+def aberto(nome="Bootcamp X", dias=10, classe="MÉDIA", prazo="13/08/2026"):
+    return OpenBootcamp(
+        name=nome, url=f"https://www.dio.me/bootcamp/{nome.lower().replace(' ','-')}",
+        classification=classe, deadline=prazo, days_left=dias,
+    )
+
+
+class TestResumoDeAbertos:
+    def test_lista_vazia_tem_mensagem_propria(self):
+        msg = _build_open_digest_message([])
+        assert "Nenhum bootcamp com inscrição aberta" in msg
+
+    def test_ordena_do_mais_urgente_ao_menos(self):
+        msg = _build_open_digest_message([
+            aberto("Bootcamp Longe", 30), aberto("Bootcamp Urgente", 1),
+            aberto("Bootcamp Meio", 10),
+        ])
+        assert msg.index("Bootcamp Urgente") < msg.index("Bootcamp Meio") < msg.index("Bootcamp Longe")
+
+    def test_destaca_ultimo_dia(self):
+        msg = _build_open_digest_message([aberto("Bootcamp Hoje", 0, prazo="03/08/2026")])
+        assert "ÚLTIMO DIA" in msg and "🔥" in msg
+
+    def test_destaca_amanha(self):
+        assert "encerra amanhã" in _build_open_digest_message([aberto("B", 1)])
+
+    def test_destaca_prazo_curto(self):
+        msg = _build_open_digest_message([aberto("B", 5)])
+        assert "🔥" in msg and "faltam <b>5 dias</b>" in msg
+
+    def test_prazo_confortavel_sem_alarme(self):
+        msg = _build_open_digest_message([aberto("B", 30)])
+        assert "🔥" not in msg and "✅" in msg
+
+    def test_mostra_contagem_total(self):
+        msg = _build_open_digest_message([aberto(f"B{i}", i + 1) for i in range(4)])
+        assert "ABERTA (4)" in msg
+
+    def test_trunca_lista_longa_e_avisa(self):
+        msg = _build_open_digest_message([aberto(f"Bootcamp {i}", i + 1) for i in range(40)])
+        assert "ABERTA (40)" in msg
+        assert "e mais 15 não listados" in msg
+        assert msg.count("https://") == MAX_DIGEST_ITEMS
+
+    def test_nunca_estoura_o_limite_da_api(self):
+        """Mensagem acima de 4096 chars é rejeitada pela Bot API."""
+        msg = _build_open_digest_message([
+            aberto("Bootcamp com nome absurdamente longo " * 4, i + 1) for i in range(40)
+        ])
+        assert len(msg) <= MAX_MESSAGE_CHARS, f"{len(msg)} chars"
+
+    def test_escapa_html_do_nome(self):
+        msg = _build_open_digest_message([aberto("<script>alert(1)</script>", 5)])
+        assert "<script>" not in msg
+
+    def test_send_open_digest_pula_vazio_por_padrao(self, notifier):
+        notifier._session.post.return_value = resposta(200, OK)
+        assert notifier.send_open_digest([]) is True
+        notifier._session.post.assert_not_called()
+
+    def test_send_open_digest_envia_vazio_se_pedido(self, notifier):
+        notifier._session.post.return_value = resposta(200, OK)
+        assert notifier.send_open_digest([], send_empty=True) is True
+        assert notifier._session.post.call_count == 1
+
+    def test_send_open_digest_envia_quando_ha_abertos(self, notifier):
+        notifier._session.post.return_value = resposta(200, OK)
+        assert notifier.send_open_digest([aberto()]) is True
+        assert notifier._session.post.call_count == 1
+
+    def test_noop_aceita_digest(self):
+        assert _NoopNotifier().send_open_digest([aberto()]) is True

@@ -18,8 +18,20 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
+
+# Os prazos do catálogo são datas brasileiras, de um site brasileiro. `date.today()`
+# devolveria a data local da máquina — em um runner do GitHub, que roda em UTC,
+# isso vira o dia seguinte a partir das 21h de Brasília, e um bootcamp que ainda
+# aceita inscrição hoje seria dado como encerrado três horas antes da hora.
+TZ_BRASIL = ZoneInfo("America/Sao_Paulo")
+
+
+def hoje_brasil() -> date:
+    """Data corrente no fuso de Brasília, independente do fuso da máquina."""
+    return datetime.now(tz=TZ_BRASIL).date()
 
 # ---------------------------------------------------------------------------
 # Constantes de classificação
@@ -433,7 +445,7 @@ def evaluate_enrollment(raw_deadline: str, today: Optional[date] = None) -> tupl
     if prazo is None:
         return ENROLLMENT_DESCONHECIDO, None
 
-    hoje = today or date.today()
+    hoje = today or hoje_brasil()
     dias = (prazo - hoje).days
 
     if dias < 0:

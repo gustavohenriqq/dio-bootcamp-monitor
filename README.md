@@ -418,6 +418,40 @@ processo seletivo se as inscrições fecharam há três anos.
 A notificação mostra a urgência — `🔥` quando faltam 7 dias ou menos, `✅` acima
 disso, e o campo é omitido quando não há prazo conhecido.
 
+### Resumo dos abertos
+
+Ao final de cada execução, o bot pode mandar a lista completa do que está com
+inscrição aberta, do mais urgente ao menos:
+
+```dotenv
+SEND_OPEN_DIGEST=true      # liga o resumo
+OPEN_DIGEST_WEEKDAYS=      # vazio = todo dia; "0" = só segunda; "0,4" = segunda e sexta
+```
+
+```text
+📋 BOOTCAMPS COM INSCRIÇÃO ABERTA (5)
+
+Bootcamp Bradesco - GenAI, Dados & Cyber
+🔥 ÚLTIMO DIA (04/08/2026) · BAIXA
+https://www.dio.me/bootcamp/bradesco-dados-ciberseguranca-genai
+
+IBM Bob: IA de Nível Empresarial para Desenvolvedores
+✅ até 08/09/2026 (35 dias) · MÉDIA
+https://www.dio.me/bootcamp/ibm-bob-ia-nivel-empresarial-para-desenvolvedores
+```
+
+Diferente das notificações de bootcamp novo, que só chegam quando há novidade,
+o resumo é uma **fotografia do estado atual** — útil para não perder prazo de
+algo que você já tinha visto e esquecido.
+
+A lista é recalculada na hora a partir da data do catálogo, **não** do
+`enrollment_status` gravado: só uma fatia do catálogo é reclassificada por
+execução (`MAX_DETAIL_PAGES`), então o valor persistido pode estar velho. A
+data, não.
+
+Quando não há nenhum aberto, o resumo é omitido — a menos que
+`SEND_EMPTY_SUMMARY=true`.
+
 ---
 
 ## Interpretação das classificações

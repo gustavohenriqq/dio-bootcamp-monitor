@@ -24,6 +24,8 @@ def ambiente_limpo(monkeypatch):
         "INITIAL_NOTIFY",
         "SEND_DAILY_SUMMARY",
         "SEND_EMPTY_SUMMARY",
+        "SEND_OPEN_DIGEST",
+        "OPEN_DIGEST_WEEKDAYS",
         "MAX_DETAIL_PAGES",
         "REQUEST_DELAY_SECONDS",
         "LOG_LEVEL",
@@ -141,3 +143,34 @@ class TestLoadConfig:
     def test_max_detail_pages_respeita_minimo(self, monkeypatch):
         monkeypatch.setenv("MAX_DETAIL_PAGES", "0")
         assert load_config(env_path=None).max_detail_pages == 1
+
+
+# ---------------------------------------------------------------------------
+# Resumo de abertos
+# ---------------------------------------------------------------------------
+
+class TestConfigDigest:
+    def test_padrao_desligado(self):
+        cfg = load_config(env_path=None)
+        assert cfg.send_open_digest is False
+        assert cfg.open_digest_weekdays == ()
+
+    def test_liga_pelo_ambiente(self, monkeypatch):
+        monkeypatch.setenv("SEND_OPEN_DIGEST", "true")
+        assert load_config(env_path=None).send_open_digest is True
+
+    def test_dias_da_semana(self, monkeypatch):
+        monkeypatch.setenv("OPEN_DIGEST_WEEKDAYS", "0,4")
+        assert load_config(env_path=None).open_digest_weekdays == (0, 4)
+
+    def test_dias_com_espacos_e_ordem_trocada(self, monkeypatch):
+        monkeypatch.setenv("OPEN_DIGEST_WEEKDAYS", " 4 , 0 ,4")
+        assert load_config(env_path=None).open_digest_weekdays == (0, 4)
+
+    def test_descarta_dias_invalidos(self, monkeypatch):
+        monkeypatch.setenv("OPEN_DIGEST_WEEKDAYS", "0,9,abc,-1,6")
+        assert load_config(env_path=None).open_digest_weekdays == (0, 6)
+
+    def test_lista_vazia_significa_todos_os_dias(self, monkeypatch):
+        monkeypatch.setenv("OPEN_DIGEST_WEEKDAYS", "")
+        assert load_config(env_path=None).open_digest_weekdays == ()

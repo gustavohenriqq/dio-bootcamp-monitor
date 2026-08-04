@@ -22,6 +22,14 @@ on:
         options:
           - "true"
           - "false"
+      send_open_digest:
+        description: "Enviar a lista de bootcamps com inscrição aberta?"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 # Impede execuções simultâneas
 concurrency:
@@ -72,6 +80,10 @@ jobs:
           INITIAL_NOTIFY: ${{ github.event.inputs.initial_notify || 'false' }}
           SEND_DAILY_SUMMARY: ${{ github.event.inputs.send_daily_summary || 'false' }}
           SEND_EMPTY_SUMMARY: "false"
+          # Lista dos bootcamps com inscrição aberta, ao final de cada execução.
+          SEND_OPEN_DIGEST: ${{ github.event.inputs.send_open_digest || 'true' }}
+          # Vazio = todos os dias. Use "0" para só às segundas, "0,4" segunda e sexta.
+          OPEN_DIGEST_WEEKDAYS: ""
           MAX_DETAIL_PAGES: "10"
           REQUEST_DELAY_SECONDS: "3"
           LOG_LEVEL: "INFO"

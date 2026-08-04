@@ -498,3 +498,31 @@ class TestPrazoNaClassificacao:
     def test_texto_vazio_sem_prazo_fica_indeterminada(self):
         r = classify("", deadline="", today=HOJE)
         assert r.classification == CLASSIFICATION_INDETERMINADA
+
+
+class TestFusoHorarioDoPrazo:
+    """
+    Os prazos são datas brasileiras. Usar a data local da máquina faria um
+    runner em UTC considerar encerrado, a partir das 21h de Brasília, um
+    bootcamp que ainda aceita inscrição naquele dia.
+    """
+
+    def test_usa_fuso_de_brasilia_e_nao_da_maquina(self, monkeypatch):
+        import classifier
+        from datetime import datetime, timezone
+
+        # 04/08 às 00:30 UTC == 03/08 às 21:30 em Brasília
+        instante = datetime(2026, 8, 4, 0, 30, tzinfo=timezone.utc)
+
+        class RelogioFalso(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return instante.astimezone(tz) if tz else instante
+
+        monkeypatch.setattr(classifier, "datetime", RelogioFalso)
+        assert classifier.hoje_brasil() == date(2026, 8, 3)
+
+        # Um bootcamp que encerra em 03/08 ainda está aberto nesse instante
+        status, dias = classifier.evaluate_enrollment("2026-08-03")
+        assert status == ENROLLMENT_ABERTO
+        assert dias == 0
