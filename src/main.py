@@ -27,9 +27,11 @@ from classifier import (
     CLASSIFICATION_INDETERMINADA,
     CLASSIFICATION_MEDIA,
     CLASSIFICATION_BAIXA,
+    ENROLLMENT_ABERTO,
     ENROLLMENT_ENCERRADO,
     classify,
     evaluate_enrollment,
+    hoje_brasil,
     parse_deadline,
 )
 from dio_scraper import CatalogBootcamp, DioScraper
@@ -44,6 +46,7 @@ from storage import (
 from telegram_notifier import (
     DailySummary,
     NewBootcampNotification,
+    OpenBootcamp,
     UpdateNotification,
     build_notifier,
 )
@@ -379,6 +382,12 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
         if config.send_daily_summary:
             notifier.send_daily_summary(summary, send_empty=config.send_empty_summary)
 
+        # Resumo dos bootcamps com inscrição aberta
+        if _deve_enviar_digest(config):
+            abertos = coletar_abertos(history)
+            logger.info("Resumo de abertos: %d bootcamps com inscrição em aberto.", len(abertos))
+            notifier.send_open_digest(abertos, send_empty=config.send_empty_summary)
+
         logger.info(
             "=== Monitor encerrado. Novos: %d | Atualizações: %d | Total histórico: %d ===",
             new_count,
@@ -403,6 +412,52 @@ def run(config: Config, storage_path: Path = DEFAULT_STORAGE_PATH) -> None:
 # ---------------------------------------------------------------------------
 # Helpers de notificação
 # ---------------------------------------------------------------------------
+
+def coletar_abertos(history: dict, today=None) -> list[OpenBootcamp]:
+    """
+    Monta a lista de bootcamps com inscrição aberta a partir do histórico.
+
+    O prazo é reavaliado agora, a partir de `launch_info`, em vez de confiar no
+    `enrollment_status` gravado: só uma parte do catálogo é reclassificada por
+    execução (MAX_DETAIL_PAGES), então o valor persistido pode estar velho. A
+    data, não.
+
+    Args:
+        history: histórico completo, indexado por stable_id.
+        today: data de referência; padrão é hoje.
+
+    Returns:
+        Bootcamps abertos, ordenados do mais urgente ao menos.
+    """
+    abertos: list[OpenBootcamp] = []
+
+    for record in history.values():
+        status, dias = evaluate_enrollment(record.launch_info, today)
+        if status != ENROLLMENT_ABERTO or dias is None:
+            continue
+        abertos.append(
+            OpenBootcamp(
+                name=record.name,
+                url=record.url,
+                classification=record.classification,
+                deadline=_formata_prazo(record.launch_info),
+                days_left=dias,
+            )
+        )
+
+    abertos.sort(key=lambda b: (b.days_left, b.name))
+    return abertos
+
+
+def _deve_enviar_digest(config: Config, today=None) -> bool:
+    """Verifica se o resumo de abertos deve ser enviado nesta execução."""
+    if not config.send_open_digest:
+        return False
+    if not config.open_digest_weekdays:
+        return True
+    hoje = today or hoje_brasil()
+    return hoje.weekday() in config.open_digest_weekdays
+
 
 def _formata_prazo(raw: str) -> str:
     """Formata o prazo do catálogo para exibição na notificação."""

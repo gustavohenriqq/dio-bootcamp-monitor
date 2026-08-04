@@ -127,6 +127,17 @@ class DailySummary:
     expirada_count: int
 
 
+@dataclass
+class OpenBootcamp:
+    """Um bootcamp com inscrição aberta, para o resumo de abertos."""
+
+    name: str
+    url: str
+    classification: str
+    deadline: str
+    days_left: int
+
+
 # ---------------------------------------------------------------------------
 # Construção das mensagens
 # ---------------------------------------------------------------------------
@@ -189,6 +200,62 @@ def _build_update_message(u: UpdateNotification) -> str:
         f"Novas evidências:\n{evidences_html}\n\n"
         f"🔗 {_esc(u.url)}"
     )
+
+
+# Limite da Bot API por mensagem. Truncamos com folga para caber cabeçalho e rodapé.
+MAX_MESSAGE_CHARS = 4000
+MAX_DIGEST_ITEMS = 25
+
+
+def _build_open_digest_message(abertos: list[OpenBootcamp]) -> str:
+    """
+    Monta o resumo dos bootcamps com inscrição aberta, do mais urgente ao menos.
+
+    Trunca a lista se necessário: a Bot API rejeita mensagens acima de 4096
+    caracteres, e uma mensagem perdida é pior que uma lista incompleta.
+    """
+    if not abertos:
+        return (
+            "📋 <b>BOOTCAMPS COM INSCRIÇÃO ABERTA</b>\n\n"
+            "Nenhum bootcamp com inscrição aberta no momento.\n"
+            "Você será avisado assim que abrir algum."
+        )
+
+    ordenados = sorted(abertos, key=lambda b: b.days_left)
+    mostrados = ordenados[:MAX_DIGEST_ITEMS]
+    ocultos = len(ordenados) - len(mostrados)
+
+    blocos: list[str] = []
+    for b in mostrados:
+        if b.days_left == 0:
+            prazo = f"🔥 <b>ÚLTIMO DIA</b> ({_esc(b.deadline)})"
+        elif b.days_left == 1:
+            prazo = f"🔥 <b>encerra amanhã</b> ({_esc(b.deadline)})"
+        elif b.days_left <= 7:
+            prazo = f"🔥 faltam <b>{b.days_left} dias</b> ({_esc(b.deadline)})"
+        else:
+            prazo = f"✅ até {_esc(b.deadline)} ({b.days_left} dias)"
+
+        blocos.append(
+            f"<b>{_esc(_truncate(b.name, 70))}</b>\n"
+            f"{prazo} · {_esc(b.classification)}\n"
+            f"{_esc(b.url)}"
+        )
+
+    corpo = "\n\n".join(blocos)
+    cabecalho = f"📋 <b>BOOTCAMPS COM INSCRIÇÃO ABERTA ({len(ordenados)})</b>\n\n"
+    rodape = f"\n\n<i>… e mais {ocultos} não listados.</i>" if ocultos > 0 else ""
+
+    mensagem = cabecalho + corpo + rodape
+
+    # Salvaguarda: se ainda estourar, corta blocos até caber.
+    while len(mensagem) > MAX_MESSAGE_CHARS and len(blocos) > 1:
+        blocos.pop()
+        ocultos = len(ordenados) - len(blocos)
+        rodape = f"\n\n<i>… e mais {ocultos} não listados.</i>"
+        mensagem = cabecalho + "\n\n".join(blocos) + rodape
+
+    return mensagem
 
 
 def _build_summary_message(s: DailySummary) -> str:
@@ -371,6 +438,27 @@ class TelegramNotifier:
         message = _build_summary_message(summary)
         return self._send(message)
 
+    def send_open_digest(
+        self,
+        abertos: list[OpenBootcamp],
+        send_empty: bool = False,
+    ) -> bool:
+        """
+        Envia o resumo dos bootcamps com inscrição aberta.
+
+        Args:
+            abertos: bootcamps com inscrição em aberto.
+            send_empty: se True, envia mesmo quando não há nenhum aberto.
+
+        Returns:
+            True se enviado ou ignorado intencionalmente.
+        """
+        if not abertos and not send_empty:
+            logger.info("Nenhum bootcamp aberto e envio de resumo vazio desativado. Pulando.")
+            return True
+
+        return self._send(_build_open_digest_message(abertos))
+
     def close(self) -> None:
         """Fecha a Session HTTP."""
         self._session.close()
@@ -393,6 +481,13 @@ class _NoopNotifier:
 
     def send_daily_summary(self, summary: DailySummary, send_empty: bool = False) -> bool:
         logger.info("Telegram não configurado. Resumo diário ignorado.")
+        return True
+
+    def send_open_digest(self, abertos: list, send_empty: bool = False) -> bool:
+        logger.info(
+            "Telegram não configurado. Resumo de abertos ignorado (%d bootcamps).",
+            len(abertos),
+        )
         return True
 
     def close(self) -> None:

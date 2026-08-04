@@ -114,6 +114,36 @@ def _env_str(key: str, default: str) -> str:
     return os.environ.get(key, "").strip() or default
 
 
+def _env_weekdays(key: str) -> tuple[int, ...]:
+    """
+    Lê lista de dias da semana separados por vírgula (0=segunda … 6=domingo).
+
+    Valores fora de 0-6 ou não numéricos são descartados com aviso. Lista vazia
+    significa "todos os dias".
+    """
+    raw = os.environ.get(key, "").strip()
+    if not raw:
+        return ()
+
+    dias: list[int] = []
+    for parte in raw.split(","):
+        parte = parte.strip()
+        if not parte:
+            continue
+        try:
+            dia = int(parte)
+        except ValueError:
+            logger.warning("Valor inválido em %s: '%s' não é um número. Ignorando.", key, parte)
+            continue
+        if 0 <= dia <= 6:
+            if dia not in dias:
+                dias.append(dia)
+        else:
+            logger.warning("Valor fora de 0-6 em %s: %d. Ignorando.", key, dia)
+
+    return tuple(sorted(dias))
+
+
 # ---------------------------------------------------------------------------
 # Dataclass de configuração
 # ---------------------------------------------------------------------------
@@ -128,6 +158,11 @@ class Config:
     initial_notify: bool = False
     send_daily_summary: bool = False
     send_empty_summary: bool = False
+    # Resumo com todos os bootcamps de inscrição aberta, ao final da execução.
+    send_open_digest: bool = False
+    # Restringe o resumo de abertos a dias da semana (0=segunda … 6=domingo).
+    # Vazio = todos os dias.
+    open_digest_weekdays: tuple[int, ...] = ()
 
     max_detail_pages: int = 10
     request_delay_seconds: float = 2.0
@@ -169,6 +204,8 @@ def load_config(env_path: Optional[Path] = DEFAULT_ENV_PATH) -> Config:
         initial_notify=_env_bool("INITIAL_NOTIFY", False),
         send_daily_summary=_env_bool("SEND_DAILY_SUMMARY", False),
         send_empty_summary=_env_bool("SEND_EMPTY_SUMMARY", False),
+        send_open_digest=_env_bool("SEND_OPEN_DIGEST", False),
+        open_digest_weekdays=_env_weekdays("OPEN_DIGEST_WEEKDAYS"),
         max_detail_pages=_env_int("MAX_DETAIL_PAGES", 10, min_val=1),
         request_delay_seconds=delay,
         log_level=_env_str("LOG_LEVEL", "INFO").upper(),

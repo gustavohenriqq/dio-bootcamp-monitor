@@ -585,3 +585,124 @@ class TestRechecagemIgnoraPrazoVencido:
             ("bc-vencido-dois", "2022-02-08", "2020-01-01T00:00:00-03:00"),
         ])
         assert urls == []
+
+
+# ---------------------------------------------------------------------------
+# Resumo de bootcamps com inscricao aberta
+# ---------------------------------------------------------------------------
+
+from datetime import date
+
+from main import _deve_enviar_digest, coletar_abertos
+
+HOJE_DIGEST = date(2026, 8, 3)  # uma segunda-feira
+
+
+def _record(sid, prazo, nome=None, classe="BAIXA"):
+    return BootcampRecord(
+        stable_id=sid, name=nome or f"Bootcamp {sid}", company="Empresa",
+        url=f"https://www.dio.me/bootcamp/{sid}",
+        first_seen_at="2026-01-01T00:00:00-03:00",
+        last_checked_at="2026-08-01T00:00:00-03:00",
+        classification=classe, score=10, evidences=[],
+        notification_status="sent", launch_info=prazo,
+    )
+
+
+class TestColetarAbertos:
+    def test_separa_abertos_de_encerrados(self):
+        history = {
+            "a": _record("a", "2026-08-31"),
+            "b": _record("b", "2021-04-14"),
+            "c": _record("c", "2026-09-08"),
+        }
+        abertos = coletar_abertos(history, today=HOJE_DIGEST)
+        assert {b.name for b in abertos} == {"Bootcamp a", "Bootcamp c"}
+
+    def test_ordena_por_urgencia(self):
+        history = {
+            "longe": _record("longe", "2026-12-31"),
+            "hoje": _record("hoje", "2026-08-03"),
+            "meio": _record("meio", "2026-08-20"),
+        }
+        abertos = coletar_abertos(history, today=HOJE_DIGEST)
+        assert [b.name for b in abertos] == ["Bootcamp hoje", "Bootcamp meio", "Bootcamp longe"]
+        assert abertos[0].days_left == 0
+
+    def test_formata_prazo_para_exibicao(self):
+        abertos = coletar_abertos({"a": _record("a", "2026-09-08")}, today=HOJE_DIGEST)
+        assert abertos[0].deadline == "08/09/2026"
+
+    def test_ignora_prazo_desconhecido(self):
+        """Sem prazo não dá para afirmar que está aberto."""
+        assert coletar_abertos({"a": _record("a", "")}, today=HOJE_DIGEST) == []
+
+    def test_reavalia_o_prazo_em_vez_de_confiar_no_gravado(self):
+        """
+        Só parte do catálogo é reclassificada por execução, então o
+        enrollment_status persistido envelhece. A data, não.
+        """
+        rec = _record("a", "2026-07-31")          # venceu em 31/07
+        rec.enrollment_status = "ABERTO"           # valor velho, de antes de vencer
+        rec.days_left = 40
+        assert coletar_abertos({"a": rec}, today=HOJE_DIGEST) == []
+
+    def test_historico_vazio(self):
+        assert coletar_abertos({}, today=HOJE_DIGEST) == []
+
+
+class TestAgendamentoDoDigest:
+    def test_desligado_nao_envia(self):
+        assert _deve_enviar_digest(make_config(send_open_digest=False)) is False
+
+    def test_ligado_sem_restricao_envia_sempre(self):
+        cfg = make_config(send_open_digest=True)
+        for dia in range(7):
+            assert _deve_enviar_digest(cfg, today=date(2026, 8, 3 + dia)) is True
+
+    def test_restrito_a_segunda_so_envia_na_segunda(self):
+        cfg = make_config(send_open_digest=True, open_digest_weekdays=(0,))
+        assert _deve_enviar_digest(cfg, today=date(2026, 8, 3)) is True   # segunda
+        assert _deve_enviar_digest(cfg, today=date(2026, 8, 4)) is False  # terça
+
+    def test_aceita_varios_dias(self):
+        cfg = make_config(send_open_digest=True, open_digest_weekdays=(0, 4))
+        assert _deve_enviar_digest(cfg, today=date(2026, 8, 3)) is True   # segunda
+        assert _deve_enviar_digest(cfg, today=date(2026, 8, 7)) is True   # sexta
+        assert _deve_enviar_digest(cfg, today=date(2026, 8, 5)) is False  # quarta
+
+
+class TestDigestNoFluxo:
+    def _rodar(self, tmp_path, **cfg_kwargs):
+        from main import run
+
+        storage_path = tmp_path / "bootcamps.json"
+        save_history({"aberto-teste-id": _record("aberto-teste-id", "2099-12-31")}, storage_path)
+
+        catalog = [CatalogBootcamp(
+            stable_id="aberto-teste-id", name="Bootcamp aberto-teste-id", company="Empresa",
+            url="https://www.dio.me/bootcamp/aberto-teste-id", summary="",
+            launch_info="2099-12-31", catalog_position=0,
+        )]
+
+        with patch("main.DioScraper") as MockScraper, \
+             patch("main.build_notifier") as MockNotifier:
+            mock_scraper = MagicMock()
+            mock_scraper.fetch_catalog.return_value = catalog
+            mock_scraper.fetch_detail.return_value = DETAIL_TEXT_BAIXA
+            MockScraper.return_value = mock_scraper
+            mock_notifier = MagicMock()
+            MockNotifier.return_value = mock_notifier
+            run(make_config(**cfg_kwargs), storage_path)
+            return mock_notifier
+
+    def test_envia_quando_ligado(self, tmp_path):
+        notifier = self._rodar(tmp_path, send_open_digest=True)
+        notifier.send_open_digest.assert_called_once()
+        abertos = notifier.send_open_digest.call_args.args[0]
+        assert len(abertos) == 1
+        assert abertos[0].name == "Bootcamp aberto-teste-id"
+
+    def test_nao_envia_quando_desligado(self, tmp_path):
+        notifier = self._rodar(tmp_path, send_open_digest=False)
+        notifier.send_open_digest.assert_not_called()
