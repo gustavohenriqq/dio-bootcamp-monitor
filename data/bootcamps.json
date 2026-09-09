@@ -232,7 +232,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/accenture-python-analise-automacao-de-dados",
     "first_seen_at": "2026-08-03T11:58:30.831425-03:00",
-    "last_checked_at": "2026-09-08T11:48:40.767641-03:00",
+    "last_checked_at": "2026-09-09T11:51:50.033540-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -244,12 +244,12 @@
     "catalog_summary": "Python, Inteligência Artificial (IA), Git, GitHub, Banco de Dados, SQL, Machine Learning",
     "status": "TRACK_LPS",
     "launch_info": "2027-05-11",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (245 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (244 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "EXPIRADA",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 245
+    "days_left": 244
   },
   {
     "stable_id": "heineken-inteligencia-artificial-aplicada-vendas",
@@ -5701,7 +5701,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/itau-java-com-inteligencia-artificial",
     "first_seen_at": "2026-08-18T08:14:17.247256-03:00",
-    "last_checked_at": "2026-09-08T11:48:44.316563-03:00",
+    "last_checked_at": "2026-09-09T11:51:53.413922-03:00",
     "classification": "BAIXA",
     "score": 11,
     "evidences": [
@@ -5714,12 +5714,12 @@
     "catalog_summary": "Java, Spring, Inteligência Artificial (IA), AI Agents",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-05",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 05/10/2026 (27 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 05/10/2026 (26 dias restantes).",
     "relevant_excerpt_hash": "f1be7cea2fa3",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 27
+    "days_left": 26
   },
   {
     "stable_id": "ci-t-java-ai-copilot",
@@ -5727,7 +5727,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/ci-t-java-ai-copilot",
     "first_seen_at": "2026-08-25T08:15:52.727747-03:00",
-    "last_checked_at": "2026-09-08T11:48:37.114604-03:00",
+    "last_checked_at": "2026-09-09T11:51:46.529827-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5739,11 +5739,11 @@
     "catalog_summary": "Java, Engenharia de Prompt, GitHub, GitHub Copilot, Spring, API Rest",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-12",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (34 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (33 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 34
+    "days_left": 33
   }
 ]
