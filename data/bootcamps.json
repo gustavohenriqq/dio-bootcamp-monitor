@@ -232,7 +232,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/accenture-python-analise-automacao-de-dados",
     "first_seen_at": "2026-08-03T11:58:30.831425-03:00",
-    "last_checked_at": "2026-09-09T11:51:50.033540-03:00",
+    "last_checked_at": "2026-09-10T11:41:21.721465-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -240,16 +240,16 @@
       "[programa cita chances reais de contratação] que com desafios de código. 5 Construa seu portfólio com projeto práticos. Tenha"
     ],
     "notification_status": "sent",
-    "catalog_position": 11,
+    "catalog_position": 13,
     "catalog_summary": "Python, Inteligência Artificial (IA), Git, GitHub, Banco de Dados, SQL, Machine Learning",
     "status": "TRACK_LPS",
     "launch_info": "2027-05-11",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (244 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (243 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "EXPIRADA",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 244
+    "days_left": 243
   },
   {
     "stable_id": "heineken-inteligencia-artificial-aplicada-vendas",
@@ -5701,7 +5701,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/itau-java-com-inteligencia-artificial",
     "first_seen_at": "2026-08-18T08:14:17.247256-03:00",
-    "last_checked_at": "2026-09-09T11:51:53.413922-03:00",
+    "last_checked_at": "2026-09-10T11:41:25.150976-03:00",
     "classification": "BAIXA",
     "score": 11,
     "evidences": [
@@ -5710,16 +5710,16 @@
       "[programa cita chances reais de contratação] que com desafios de código. 5 Construa seu portfólio com projeto práticos. Tenha"
     ],
     "notification_status": "sent",
-    "catalog_position": 1,
+    "catalog_position": 2,
     "catalog_summary": "Java, Spring, Inteligência Artificial (IA), AI Agents",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-05",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 05/10/2026 (26 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 05/10/2026 (25 dias restantes).",
     "relevant_excerpt_hash": "f1be7cea2fa3",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 26
+    "days_left": 25
   },
   {
     "stable_id": "ci-t-java-ai-copilot",
@@ -5727,7 +5727,32 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/ci-t-java-ai-copilot",
     "first_seen_at": "2026-08-25T08:15:52.727747-03:00",
-    "last_checked_at": "2026-09-09T11:51:46.529827-03:00",
+    "last_checked_at": "2026-09-10T11:41:18.294117-03:00",
+    "classification": "BAIXA",
+    "score": 8,
+    "evidences": [
+      "[perfil disponível na Talent Match] munidade. 4 Pratique com desafios de código. 5 Construa seu portfólio com projet",
+      "[programa cita chances reais de contratação] que com desafios de código. 5 Construa seu portfólio com projeto práticos. Tenha"
+    ],
+    "notification_status": "sent",
+    "catalog_position": 1,
+    "catalog_summary": "Java, Engenharia de Prompt, GitHub, GitHub Copilot, Spring, API Rest",
+    "status": "TRACK_LPS",
+    "launch_info": "2026-10-12",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (32 dias restantes).",
+    "relevant_excerpt_hash": "9ce648a486e4",
+    "previous_classification": "",
+    "update_notification_hashes": [],
+    "enrollment_status": "ABERTO",
+    "days_left": 32
+  },
+  {
+    "stable_id": "reclame-aqui-dados-e-ia-na-pratica",
+    "name": "Reclame Aqui - Dados e IA na Prática",
+    "company": "",
+    "url": "https://www.dio.me/bootcamp/reclame-aqui-dados-e-ia-na-pratica",
+    "first_seen_at": "2026-09-10T11:41:10.055517-03:00",
+    "last_checked_at": "2026-09-10T11:41:10.055517-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5736,14 +5761,39 @@
     ],
     "notification_status": "sent",
     "catalog_position": 0,
-    "catalog_summary": "Java, Engenharia de Prompt, GitHub, GitHub Copilot, Spring, API Rest",
+    "catalog_summary": "Excel",
     "status": "TRACK_LPS",
-    "launch_info": "2026-10-12",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (33 dias restantes).",
+    "launch_info": "2026-10-26",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 26/10/2026 (46 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 33
+    "days_left": 46
+  },
+  {
+    "stable_id": "ibm-confluent-dados-em-tempo-real-para-agentes-de-ia",
+    "name": "IBM Confluent - Dados em tempo real para agentes de IA",
+    "company": "",
+    "url": "https://www.dio.me/bootcamp/ibm-confluent-dados-em-tempo-real-para-agentes-de-ia",
+    "first_seen_at": "2026-09-10T11:41:14.298935-03:00",
+    "last_checked_at": "2026-09-10T11:41:14.298935-03:00",
+    "classification": "BAIXA",
+    "score": 8,
+    "evidences": [
+      "[perfil disponível na Talent Match] munidade. 4 Pratique com desafios de código. 5 Construa seu portfólio com projet",
+      "[programa cita chances reais de contratação] que com desafios de código. 5 Construa seu portfólio com projeto práticos. Tenha"
+    ],
+    "notification_status": "sent",
+    "catalog_position": 5,
+    "catalog_summary": "AI Agents, IBM Confluent",
+    "status": "TRACK_LPS",
+    "launch_info": "2026-10-19",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 19/10/2026 (39 dias restantes).",
+    "relevant_excerpt_hash": "9ce648a486e4",
+    "previous_classification": "",
+    "update_notification_hashes": [],
+    "enrollment_status": "ABERTO",
+    "days_left": 39
   }
 ]
