@@ -232,7 +232,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/accenture-python-analise-automacao-de-dados",
     "first_seen_at": "2026-08-03T11:58:30.831425-03:00",
-    "last_checked_at": "2026-09-21T13:41:10.755651-03:00",
+    "last_checked_at": "2026-09-22T12:12:53.873977-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -244,12 +244,12 @@
     "catalog_summary": "Python, Inteligência Artificial (IA), Git, GitHub, Banco de Dados, SQL, Machine Learning",
     "status": "TRACK_LPS",
     "launch_info": "2027-05-11",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (232 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (231 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "EXPIRADA",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 232
+    "days_left": 231
   },
   {
     "stable_id": "heineken-inteligencia-artificial-aplicada-vendas",
@@ -5701,7 +5701,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/itau-java-com-inteligencia-artificial",
     "first_seen_at": "2026-08-18T08:14:17.247256-03:00",
-    "last_checked_at": "2026-09-21T13:41:14.175515-03:00",
+    "last_checked_at": "2026-09-22T12:12:57.282571-03:00",
     "classification": "BAIXA",
     "score": 11,
     "evidences": [
@@ -5714,12 +5714,12 @@
     "catalog_summary": "Java, Spring, Inteligência Artificial (IA), AI Agents",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-12",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (21 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (20 dias restantes).",
     "relevant_excerpt_hash": "f1be7cea2fa3",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 21
+    "days_left": 20
   },
   {
     "stable_id": "ci-t-java-ai-copilot",
@@ -5727,7 +5727,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/ci-t-java-ai-copilot",
     "first_seen_at": "2026-08-25T08:15:52.727747-03:00",
-    "last_checked_at": "2026-09-21T13:41:07.007708-03:00",
+    "last_checked_at": "2026-09-22T12:12:50.338944-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5739,12 +5739,12 @@
     "catalog_summary": "Java, Engenharia de Prompt, GitHub, GitHub Copilot, Spring, API Rest",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-12",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (21 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 12/10/2026 (20 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 21
+    "days_left": 20
   },
   {
     "stable_id": "reclame-aqui-dados-e-ia-na-pratica",
@@ -5752,7 +5752,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/reclame-aqui-dados-e-ia-na-pratica",
     "first_seen_at": "2026-09-10T11:41:10.055517-03:00",
-    "last_checked_at": "2026-09-21T13:41:00.049135-03:00",
+    "last_checked_at": "2026-09-22T12:12:41.576440-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5764,12 +5764,12 @@
     "catalog_summary": "Excel, Inteligência Artificial (IA), Engenharia de Prompt, AI Agents",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-26",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 26/10/2026 (35 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 26/10/2026 (34 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 35
+    "days_left": 34
   },
   {
     "stable_id": "ibm-confluent-dados-em-tempo-real-para-agentes-de-ia",
@@ -5777,7 +5777,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/ibm-confluent-dados-em-tempo-real-para-agentes-de-ia",
     "first_seen_at": "2026-09-10T11:41:14.298935-03:00",
-    "last_checked_at": "2026-09-21T13:41:03.567579-03:00",
+    "last_checked_at": "2026-09-22T12:12:45.321201-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5789,11 +5789,11 @@
     "catalog_summary": "IBM Confluent, Event Driven, Confluent Cloud",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-19",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 19/10/2026 (28 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 19/10/2026 (27 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 28
+    "days_left": 27
   }
 ]
