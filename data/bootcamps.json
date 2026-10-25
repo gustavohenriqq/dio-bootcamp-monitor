@@ -232,7 +232,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/accenture-python-analise-automacao-de-dados",
     "first_seen_at": "2026-08-03T11:58:30.831425-03:00",
-    "last_checked_at": "2026-10-24T11:09:51.108869-03:00",
+    "last_checked_at": "2026-10-25T11:38:47.526788-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -244,12 +244,12 @@
     "catalog_summary": "Python, Inteligência Artificial (IA), Git, GitHub, Banco de Dados, SQL, Machine Learning",
     "status": "TRACK_LPS",
     "launch_info": "2027-05-11",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (199 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 11/05/2027 (198 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "EXPIRADA",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 199
+    "days_left": 198
   },
   {
     "stable_id": "heineken-inteligencia-artificial-aplicada-vendas",
@@ -5701,7 +5701,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/itau-java-com-inteligencia-artificial",
     "first_seen_at": "2026-08-18T08:14:17.247256-03:00",
-    "last_checked_at": "2026-10-24T11:09:33.922254-03:00",
+    "last_checked_at": "2026-10-25T11:38:29.474387-03:00",
     "classification": "BAIXA",
     "score": 11,
     "evidences": [
@@ -5714,12 +5714,12 @@
     "catalog_summary": "Java, Spring, Inteligência Artificial (IA), AI Agents",
     "status": "TRACK_LPS",
     "launch_info": "2026-12-07",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 07/12/2026 (44 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 07/12/2026 (43 dias restantes).",
     "relevant_excerpt_hash": "f1be7cea2fa3",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 44
+    "days_left": 43
   },
   {
     "stable_id": "ci-t-java-ai-copilot",
@@ -5752,7 +5752,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/reclame-aqui-dados-e-ia-na-pratica",
     "first_seen_at": "2026-09-10T11:41:10.055517-03:00",
-    "last_checked_at": "2026-10-24T11:09:47.682965-03:00",
+    "last_checked_at": "2026-10-25T11:38:43.759233-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5764,12 +5764,12 @@
     "catalog_summary": "Excel, Inteligência Artificial (IA), Engenharia de Prompt, AI Agents",
     "status": "TRACK_LPS",
     "launch_info": "2026-10-26",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 26/10/2026 (2 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições encerram amanhã (26/10/2026).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 2
+    "days_left": 1
   },
   {
     "stable_id": "ibm-confluent-dados-em-tempo-real-para-agentes-de-ia",
@@ -5802,7 +5802,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/bradesco-agentes-de-ia-do-zero-a-pratica",
     "first_seen_at": "2026-10-08T14:37:54.429377-03:00",
-    "last_checked_at": "2026-10-24T11:09:44.139785-03:00",
+    "last_checked_at": "2026-10-25T11:38:40.268409-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5814,12 +5814,12 @@
     "catalog_summary": "AI Agents, SQL, Python, CrewAI, Lovable",
     "status": "TRACK_LPS",
     "launch_info": "2026-11-16",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 16/11/2026 (23 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 16/11/2026 (22 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 23
+    "days_left": 22
   },
   {
     "stable_id": "dxc-ia-do-zero-ao-primeiro-agente",
@@ -5827,7 +5827,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/dxc-ia-do-zero-ao-primeiro-agente",
     "first_seen_at": "2026-10-09T14:13:54.805572-03:00",
-    "last_checked_at": "2026-10-24T11:09:40.735490-03:00",
+    "last_checked_at": "2026-10-25T11:38:36.832166-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5839,12 +5839,12 @@
     "catalog_summary": "AI Agents, Inteligência Artificial (IA), Engenharia de Prompt, LLMs",
     "status": "TRACK_LPS",
     "launch_info": "2026-11-16",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 16/11/2026 (23 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 16/11/2026 (22 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 23
+    "days_left": 22
   },
   {
     "stable_id": "neo4j-certification",
@@ -5852,7 +5852,7 @@
     "company": "",
     "url": "https://www.dio.me/bootcamp/neo4j-certification",
     "first_seen_at": "2026-10-15T12:23:34.305823-03:00",
-    "last_checked_at": "2026-10-24T11:09:37.302915-03:00",
+    "last_checked_at": "2026-10-25T11:38:33.276512-03:00",
     "classification": "BAIXA",
     "score": 8,
     "evidences": [
@@ -5864,11 +5864,11 @@
     "catalog_summary": "Neo4J, IA Generativa",
     "status": "TRACK_LPS",
     "launch_info": "2026-11-30",
-    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 30/11/2026 (37 dias restantes).",
+    "observation": "Menções vagas de oportunidade sem processo concreto identificado. Inscrições abertas até 30/11/2026 (36 dias restantes).",
     "relevant_excerpt_hash": "9ce648a486e4",
     "previous_classification": "",
     "update_notification_hashes": [],
     "enrollment_status": "ABERTO",
-    "days_left": 37
+    "days_left": 36
   }
 ]
